@@ -123,7 +123,7 @@ enum gamestates {
 
 #define PLAYER_X_START 			320
 #define PLAYER_Y_START 			440
-#define PLAYER_MOVE_SPEED 		2
+#define PLAYER_MOVE_SPEED 		8
 #define MAX_PLAYER_BULLET_COUNT 1
 
 
