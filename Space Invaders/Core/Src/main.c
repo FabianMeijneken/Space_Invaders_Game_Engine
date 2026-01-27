@@ -126,7 +126,7 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
 	// Klokdeler init:
-	char sprite_move_clock_counter = 1;
+z	char sprite_move_clock_counter = 1;
 	bool sprite_move_clock = false;
 
 	char game_over_clock_counter = 1;
