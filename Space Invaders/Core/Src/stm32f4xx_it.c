@@ -42,7 +42,7 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
 
-extern bool update_tick_20hz;
+extern volatile bool update_tick_20hz;
 
 
 /* USER CODE END PV */
