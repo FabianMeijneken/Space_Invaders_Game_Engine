@@ -80,28 +80,31 @@ enum gamestates {
 	GAME_WON
 };
 
-#define KLOKDELER_SPRITE_UPDATE 10				// Deze deelt een 20 Hz klok. met een waar van 10 bewegen de sprites op 2 Hz.
+#define KLOKDELER_SPRITE_UPDATE 2				// Deze deelt een 20 Hz klok. met een waar van 10 bewegen de sprites op 2 Hz.
 
 
 // Finn van Zijverden hieronder
-#define MAX_BULLET_AMOUNT 5
-#define BULLET_MOVE_SPEED 5
+#define MAX_BULLET_AMOUNT 		5
+#define BULLET_MOVE_SPEED 		20
+#define BULLET_Y_MIN			20
+#define BULLET_Y_MAX			450
+
 
 
 // Kim lobstein hieronder
-#define MAX_SPRITE_Y 			400
-#define MAX_X_SPRITES 			630
+#define MAX_SPRITE_Y 			250
+#define MAX_X_SPRITES 			600
 #define MIN_X_SPRITES 			10
 
 #define SPRITES_PER_RIJ 		6
 #define AANTAL_RIJEN_SPRITES 	5
-#define SPRITE_X_MOVE_SPEED 	5
-#define SPRITE_Y_MOVE_SPEED 	10
+#define SPRITE_X_MOVE_SPEED 	10
+#define SPRITE_Y_MOVE_SPEED 	50
 
-#define SPRITES_X_OFFSET		80		// Start X van sprite linksboven
-#define SPRITES_Y_OFFSET		96		// Start Y van sprite linksboven
-#define SPRITES_X_AFSTAND		46		// Afstand tussen sprites (X) (begin tot volgende begin)
-#define SPRITES_Y_AFSTAND		46		// Afstand tussen sprites (Y) (begin tot volgende begin)
+#define SPRITES_X_OFFSET		15		// Start X van sprite linksboven
+#define SPRITES_Y_OFFSET		36		// Start Y van sprite linksboven
+#define SPRITES_X_AFSTAND		40		// Afstand tussen sprites (X) (begin tot volgende begin)
+#define SPRITES_Y_AFSTAND		10		// Afstand tussen sprites (Y) (begin tot volgende begin)
 
 #define BULLET_BREEDTE 			5		// todo: updaten met echte waarde.
 #define BULLET_LENGTE 			32
@@ -112,10 +115,12 @@ enum gamestates {
 
 // Fabian Meijneken hieronder
 #define PLAYER_X_START 			320
-#define PLAYER_Y_START 			250
-#define PLAYER_MOVE_SPEED 		20
-#define MAX_PLAYER_BULLET_COUNT 2
+#define PLAYER_Y_START 			440
+#define PLAYER_MOVE_SPEED 		2
+#define MAX_PLAYER_BULLET_COUNT 1
 #define SCORE_PER_ENEMIE		40		// 10 punten per enemie die je doodschiet.
+#define BULLET_FREQUENCY		20		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY = 5;
+
 
 #define COMMAND_THRESHOLD		10		// De maximale geaccepteerde frequentie error in de input handler. todo: goedzetten. (bram vragen)
 
