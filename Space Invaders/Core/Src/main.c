@@ -16,6 +16,13 @@
   * @author 		: Finn van Zijverden, Kim Lobstein, Fabian Meijneken
   ******************************************************************************
   */
+
+
+
+// TODO At collision, send command for only that row. This saves uart size, maby that removes the stutter on colision?
+// TODO Check voor game ending.
+
+
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
