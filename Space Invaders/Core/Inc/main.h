@@ -73,7 +73,8 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 enum gamestates {
-	GAME_STARTING,				// Wordt gebruikt voor de korte tijd voor de start van de game engine. Kan ook voor een herstart worden gebruikt..
+	GAME_RESET,					// Wordt gebruikt als het spel naar zijn origiele staat moet worden gereset.
+	GAME_STARTING,				// Wordt automatisch na GAME_RESET getriggert, hierin wordt gewacht totdat alle UART Commando's uitgestuurd zijn.
 	GAME_PAUSED,				// Tijdens een pauze beweegt niets meer, maar UART updates worden nogsteeds verzonden (voor bijv. tekst).
 	GAME_RUNNING,
 	GAME_OVER,
@@ -85,7 +86,7 @@ enum gamestates {
 
 // Finn van Zijverden hieronder
 #define MAX_BULLET_AMOUNT 		5
-#define BULLET_MOVE_SPEED 		20
+#define BULLET_MOVE_SPEED 		10
 #define BULLET_Y_MIN			20
 #define BULLET_Y_MAX			450
 
@@ -106,11 +107,9 @@ enum gamestates {
 #define SPRITES_X_AFSTAND		40		// Afstand tussen sprites (X) (begin tot volgende begin)
 #define SPRITES_Y_AFSTAND		10		// Afstand tussen sprites (Y) (begin tot volgende begin)
 
-#define BULLET_BREEDTE 			5		// todo: updaten met echte waarde.
-#define BULLET_LENGTE 			32
 #define SPRITE_LENGTE 			32
 #define SPRITE_BREEDTE 			32
-#define SPELER_BREEDTE 			32
+
 
 
 // Fabian Meijneken hieronder
@@ -119,7 +118,13 @@ enum gamestates {
 #define PLAYER_MOVE_SPEED 		2
 #define MAX_PLAYER_BULLET_COUNT 1
 #define SCORE_PER_ENEMIE		40		// 10 punten per enemie die je doodschiet.
-#define BULLET_FREQUENCY		20		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY = 5;
+#define BULLET_FREQUENCY		3		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY == 1;
+
+#define BULLET_BREEDTE 			4
+#define BULLET_LENGTE 			9
+
+#define SPELER_BREEDTE 			20
+#define SPELER_LENGTE 			22
 
 
 #define COMMAND_THRESHOLD		10		// De maximale geaccepteerde frequentie error in de input handler. todo: goedzetten. (bram vragen)
@@ -170,6 +175,39 @@ typedef struct
 
 
 //-------------------- Einde Fabian Meijneken --------------------//
+
+
+
+
+
+
+//-------------------- Function prototypes --------------------//
+
+//----- Finn van Zijverden -----//
+void BulletBeheer(bullet_struct* bullets, char actie, int bulletID, bool shot_by_user, player_struct* player, sprite_struct* sprite, int sprite_num);
+uint8_t ID_checker(bullet_struct* bullets);
+void bulletUpdater(bullet_struct* bullets, player_struct* player);
+//----- Einde Finn van Zijverden -----//
+
+
+//----- Kim Lobstein -----//
+void move_sprites(sprite_struct* sprites);
+void collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_struct* bullets, uint8_t bulletIndex, uint8_t BB);
+void collision_check_all_bullets(sprite_struct* sprites, player_struct* player, bullet_struct* bullets);
+//----- Einde Kim Lobstein -----//
+
+
+//----- Fabian Meijneken -----//
+void player_move(player_struct* player, char move_left);
+void player_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite);
+void enemy_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite, int sprite_num);
+
+//----- Einde Fabian Meijneken -----//
+
+
+//----- Bram Laurens -----//
+void run_dft();
+//----- Einde Bram Laurens -----//
 
 
 /* USER CODE END Private defines */

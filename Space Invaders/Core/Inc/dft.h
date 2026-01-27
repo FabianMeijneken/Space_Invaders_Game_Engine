@@ -13,6 +13,8 @@
 
 // External variables
 extern int ADC_buffer[ADC_BUFFER_SIZE];
+extern enum gamestates game_status;
+
 
 // Defines
 #define Fs 10000.0f		 			// Sampling frequency
@@ -23,3 +25,5 @@ extern int ADC_buffer[ADC_BUFFER_SIZE];
 void init_LUTs();
 float lut_lookup(float *lut, float index);
 float DFT_compute_LUT(float DFT_frequency);
+void command_handler(uint8_t command, player_struct* player, bullet_struct* bullets, sprite_struct* sprite);
+

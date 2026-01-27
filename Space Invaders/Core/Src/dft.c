@@ -4,7 +4,7 @@
   * @brief          : Alle functies betreft de dft
   ******************************************************************************
   *
-  * @author 		: Bram Laurens
+  * @author 		: Bram Laurens, Fabian Meijneken
   ******************************************************************************
   */
 
@@ -100,4 +100,47 @@ float DFT_compute_LUT(float DFT_frequency)
 
   // Return the magnitude
   return sqrtf(real * real + imag * imag);
+}
+
+
+
+
+
+/**
+ * @brief Deze functie handelt commando's af. Hiervoor ontvangt hij informatie van de DFT.
+ *
+ * @author Fabian meijneken
+ * @date 24/01/2026
+ *
+ * @param command - Het commando dat uitgevoerd moet worden
+ * @param player - pointer naar de player struct
+ * @param bullets - pointer naar het eerste item in de bullets array
+ * @param sprite - pointer naar het eerste item in de sprite array
+ *
+ * @return void
+ */
+void command_handler(uint8_t command, player_struct* player, bullet_struct* bullets, sprite_struct* sprite)
+{
+	switch (command)
+	{
+		// Pauzeer het spel
+		case 0:
+			if (game_status == GAME_RUNNING)
+				game_status = GAME_PAUSED;
+			if (game_status == GAME_PAUSED)
+				game_status = GAME_RUNNING;
+
+		// Beweeg naar links
+		case 1:
+			player_move(player, 1);
+
+		// Beweeg naar rechts
+		case 2:
+			player_move(player, 0);
+
+		// Schiet
+		case 3:
+			player_shoot(player, bullets, sprite);
+
+	}
 }
