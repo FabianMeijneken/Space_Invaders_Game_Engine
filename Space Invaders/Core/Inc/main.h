@@ -139,7 +139,7 @@ enum gamestates {
 
 
 // Bram Laurens hieronder
-#define ADC_BUFFER_SIZE			1000
+#define ADC_BUFFER_SIZE			200
 
 
 

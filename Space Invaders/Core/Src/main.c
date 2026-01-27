@@ -209,8 +209,6 @@ int main(void)
 		(void)HAL_UART_Transmit(&huart2, (uint8_t*)msg, (uint16_t)msg_length, 100);
 		#endif
 
-		HAL_Delay(50);
-
 		// Update het spel alleen als de game loopt.
 		switch (game_status)
 		{
@@ -287,7 +285,7 @@ int main(void)
 					HAL_GPIO_TogglePin(LED_oranje_GPIO_Port, LED_oranje_Pin);
 
 					//----- DFT update -----//
-//					run_dft();
+					run_dft(&player, &bullets, &sprites);
 
 					// Check voor collision
 					collision_check_all_bullets(sprites, &player, bullets);
@@ -1104,12 +1102,13 @@ void run_dft(player_struct* player, bullet_struct* bullets, sprite_struct* sprit
 	// 1: beweeg links
 	// 2: beweeg rechts
 	// 3: schiet
-	for (uint8_t command = 0; (command < 4 - 1); command++)
+		for (uint8_t command = 0; (command < 4 - 1); command++)
 	{
-		// Compute the magnitude for the current command frequency range
-		// If the magnitude exceeds the threshold, execute the corresponding command
-		// if (magnitude >= COMMAND_THRESHOLD)
-		// 	command_handler(command, player, bullets, sprites);
+		float magnitude = DFT_range_peak(command_dft_list[command].frequency_min, command_dft_list[command].frequency_max);
+		if(magnitude > command_dft_list[command].threshold)
+		{
+			command_handler(command, player, bullets, sprites);
+		}
 	}
 }
 

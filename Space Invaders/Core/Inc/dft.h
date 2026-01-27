@@ -39,7 +39,6 @@ typedef struct {
     float threshold;
 } commanddft_struct, *commandsdft_ptr;
 
-// Defined in exactly one .c file (see `Core/Src/dft.c`).
 extern const commanddft_struct command_dft_list[CMD_amount];
 
 #endif /* DFT_H */

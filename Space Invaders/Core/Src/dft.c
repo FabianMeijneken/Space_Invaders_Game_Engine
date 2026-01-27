@@ -16,10 +16,10 @@ static float sin_LUT[ADC_BUFFER_SIZE];
 static float cos_LUT[ADC_BUFFER_SIZE];
 
 const commanddft_struct command_dft_list[CMD_amount] = {
-  {0, 600,1100, 0.7},    // Command 0: pauze
+  {0, 4009,4500, 0.7},    // Command 0: pauze
   {1, 1100, 1500, 0.7},   // Command 1: beweeg links
   {2, 1500, 2000, 0.5},  // Command 2: beweeg rechts
-  {3, 4000, 4500, 0.2}   // Command 3: schiet
+  {3, 600, 1100, 0.2}   // Command 3: schiet
 };
 
 
@@ -66,7 +66,7 @@ float DFT_range_peak(float freq_min, float freq_max)
     float max_magnitude = 0.0f;
 
     // Scan through the frequency range with a step size
-    float step_size = 10.0f; // Adjust step size as needed
+    float step_size = 50.0f; // Adjust step size as needed
     for (float freq = freq_min; freq <= freq_max; freq += step_size)
     {
         float magnitude = DFT_compute_LUT(freq);
@@ -154,18 +154,22 @@ void command_handler(uint8_t command, player_struct* player, bullet_struct* bull
 				game_status = GAME_PAUSED;
 			if (game_status == GAME_PAUSED)
 				game_status = GAME_RUNNING;
+      break;
 
 		// Beweeg naar links
 		case 1:
 			player_move(player, 1);
+      break;
 
 		// Beweeg naar rechts
 		case 2:
 			player_move(player, 0);
+      break;
 
 		// Schiet
 		case 3:
 			player_shoot(player, bullets, sprite);
+      break;
 
 	}
 }
