@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug STM32 (ST-Link)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "stlink",
+      "device": "STM32F407VG",
+      "interface": "swd",
+      "executable": "${workspaceFolder}/Debug/Space Invaders.elf",
+      "cwd": "${workspaceFolder}",
+      "runToEntryPoint": "main",
+      "svdFile": "${workspaceFolder}/STM32F407.svd"
+    }
+  ]
+}

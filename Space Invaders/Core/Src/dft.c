@@ -15,6 +15,13 @@
 static float sin_LUT[ADC_BUFFER_SIZE];
 static float cos_LUT[ADC_BUFFER_SIZE];
 
+const commanddft_struct command_dft_list[CMD_amount] = {
+  {0, 600,1100, 0.7},    // Command 0: pauze
+  {1, 1100, 1500, 0.7},   // Command 1: beweeg links
+  {2, 1500, 2000, 0.5},  // Command 2: beweeg rechts
+  {3, 4000, 4500, 0.2}   // Command 3: schiet
+};
+
 
 
 /**
@@ -52,6 +59,24 @@ float lut_lookup(float *lut, float index)
   float frac = index - (float)i0;
 
   return lut[i0] + frac * (lut[i1] - lut[i0]);
+}
+
+float DFT_range_peak(float freq_min, float freq_max)
+{
+    float max_magnitude = 0.0f;
+
+    // Scan through the frequency range with a step size
+    float step_size = 10.0f; // Adjust step size as needed
+    for (float freq = freq_min; freq <= freq_max; freq += step_size)
+    {
+        float magnitude = DFT_compute_LUT(freq);
+        if (magnitude > max_magnitude)
+        {
+            max_magnitude = magnitude;
+        }
+    }
+
+    return max_magnitude;
 }
 
 /**

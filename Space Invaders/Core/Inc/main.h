@@ -64,6 +64,10 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+/*FPGA COMMUNICATION ENABLE*/
+#define OUTPUT_FPGA
+//#define OUTPUT_DFT_DEBUG
+
 #define LED_groen_Pin GPIO_PIN_12
 #define LED_groen_GPIO_Port GPIOD
 #define LED_oranje_Pin GPIO_PIN_13

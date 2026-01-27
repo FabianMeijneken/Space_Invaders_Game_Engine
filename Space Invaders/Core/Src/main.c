@@ -77,14 +77,14 @@ uint8_t uart2_DMA_tx_bytes[4] = {0};
 
 
 // DFT variables
-uint32_t current_ADC_value;
+// ADC DMA will continuously fill this block buffer; we copy into ADC_buffer in the DMA callbacks.
+#define ADC_DMA_BLOCK_SAMPLES 64
+static uint16_t adc_dma_block[ADC_DMA_BLOCK_SAMPLES];
+static volatile bool adc_dma_block_ready = false; // Set true when a full 64-sample block has been captured.
+
 int ADC_buffer[ADC_BUFFER_SIZE];
-bool buffer_full = false;
-bool new_ADC_value_recieved = false;
-int ADC_index = 0;
-
-int command_freqs[] = {500, 1000, 1500, 2000}; 	// TODO: Deze frequenties aanpassen.
-
+volatile bool buffer_full = false;
+volatile uint32_t ADC_index = 0;
 
 /* USER CODE END PV */
 
@@ -129,37 +129,40 @@ int main(void)
 	bullet_struct bullets[MAX_BULLET_AMOUNT];
 
 
-  /* USER CODE END 1 */
+	/* USER CODE END 1 */
 
-  /* MCU Configuration--------------------------------------------------------*/
+	/* MCU Configuration--------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+	HAL_Init();
 
-  /* USER CODE BEGIN Init */
+	/* USER CODE BEGIN Init */
 
-  /* USER CODE END Init */
+	/* USER CODE END Init */
 
-  /* Configure the system clock */
-  SystemClock_Config();
+	/* Configure the system clock */
+	SystemClock_Config();
 
-  /* USER CODE BEGIN SysInit */
+	/* USER CODE BEGIN SysInit */
 
 
-  /* USER CODE END SysInit */
+	/* USER CODE END SysInit */
 
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_DMA_Init();
-  MX_TIM3_Init();
-  MX_USART2_UART_Init();
-  MX_ADC1_Init();
-  MX_TIM4_Init();
-  /* USER CODE BEGIN 2 */
+	/* Initialize all configured peripherals */
+	MX_GPIO_Init();
+	MX_DMA_Init();
+	MX_TIM3_Init();
+	MX_USART2_UART_Init();
+	MX_ADC1_Init();
+	MX_TIM4_Init();
+	/* USER CODE BEGIN 2 */
 
-  HAL_TIM_Base_Start_IT(&htim3);		// Gebruikt voor DFT.
-  HAL_TIM_Base_Start_IT(&htim4);		// Gebruikt voor game updates.
-  HAL_ADC_Start_DMA(&hadc1, &current_ADC_value, 1); // Link the ADC DMA to current_ADC_value.
+	HAL_TIM_Base_Start_IT(&htim3);		// Gebruikt voor DFT.
+	HAL_TIM_Base_Start_IT(&htim4);		// Gebruikt voor game updates.
+	// Capture ADC samples in blocks of 64; HAL will call Conv(Half)Cplt callbacks via DMA.
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_block, ADC_DMA_BLOCK_SAMPLES);
+
+	init_LUTs();						// Initialiseer de LUTs voor de DFT.
 
   /* USER CODE END 2 */
 
@@ -167,6 +170,34 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 	while (1)
 	{
+		// Debug: only run/print when we have a full ADC buffer and UART2 is idle.
+		// NOTE: USART2 is also used for DMA TX to the FPGA; mixing DMA + blocking TX can result in HAL_BUSY.
+		
+
+		#ifdef OUTPUT_DFT_DEBUG
+		int msg_length;
+		char msg[64];
+		float peak;
+		
+		peak = DFT_range_peak(600.0f, 1100.0f);
+		msg_length = snprintf(msg, sizeof(msg), "DFT Peak 600Hz-1.1kHz: %.2f	", peak);
+		(void)HAL_UART_Transmit(&huart2, (uint8_t*)msg, (uint16_t)msg_length, 100);
+
+		peak = DFT_range_peak(1100.0f, 1500.0f);
+		msg_length = snprintf(msg, sizeof(msg), "DFT Peak 1.1kHz-1.5kHz: %.2f	", peak);
+		(void)HAL_UART_Transmit(&huart2, (uint8_t*)msg, (uint16_t)msg_length, 100);
+
+		peak = DFT_range_peak(1500.0f, 2000.0f);
+		msg_length = snprintf(msg, sizeof(msg), "DFT Peak 1.5kHz-2kHz: %.2f		", peak);
+		(void)HAL_UART_Transmit(&huart2, (uint8_t*)msg, (uint16_t)msg_length, 100);
+
+		peak = DFT_range_peak(4000.0f, 4500.0f);
+		msg_length = snprintf(msg, sizeof(msg), "DFT Peak 4kHz-4.5kHz: %.2f	\r\n", peak);
+		(void)HAL_UART_Transmit(&huart2, (uint8_t*)msg, (uint16_t)msg_length, 100);
+		#endif
+
+		HAL_Delay(50);
+
 		// Update het spel alleen als de game loopt.
 		switch (game_status)
 		{
@@ -209,11 +240,13 @@ int main(void)
 				// Verstuur kogel locaties
 				for (int i = 0; i < MAX_BULLET_AMOUNT; i++)
 				{
+					#ifdef OUTPUT_FPGA
 					update_FPGA((6 + i),
 								(bullets + i)->X_pos,
 								(bullets + i)->Y_pos,
 								((bullets + i)->richting << 1) | (bullets + i)->actief		// LSB is nu "richting", bitje links daarvan is "actief"
 								);
+					#endif
 				}
 
 
@@ -249,16 +282,19 @@ int main(void)
 //					Verstuur kogel locaties
 					for (int i = 0; i < MAX_BULLET_AMOUNT; i++)
 					{
+						#ifdef OUTPUT_FPGA
 						update_FPGA((bullets + i)->object_ID,
 									(bullets + i)->X_pos,
 									(bullets + i)->Y_pos,
 									((bullets + i)->richting << 1) | (bullets + i)->actief		// LSB is nu "richting", bitje links daarvan is "actief"
 									);	
+						#endif
 					}
 
 					// Verstuur speler locatie
+					#ifdef OUTPUT_FPGA
 					update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, 0b1);
-
+					#endif
 
 					update_tick_20hz = false;
 
@@ -288,7 +324,9 @@ int main(void)
 						for (int i = 0; i < SPRITES_PER_RIJ; i++)
 							render_bits |= ((sprites + ((rij-1) * 6) + i) -> alive) << (SPRITES_PER_RIJ - 1 - i);
 
+						#ifdef OUTPUT_FPGA
 						update_FPGA(rij, (sprites + ((rij-1) * 6))->X_pos, (sprites + ((rij-1) * 6))->Y_pos, render_bits);
+						#endif
 					}
 
 
@@ -316,7 +354,9 @@ int main(void)
 					player_move(&player, 0);
 
 					// Verstuur speler locatie
+					#ifdef OUTPUT_FPGA
 					update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, 0b1);
+					#endif
 
 					update_tick_20hz = false;
 				}
@@ -351,34 +391,6 @@ int main(void)
 		}
 
 
-		// Add new ADC value to the circular ADC buffer
-		if (new_ADC_value_recieved)
-		{
-			if(ADC_index < ADC_BUFFER_SIZE)
-			  {
-			      ADC_buffer[ADC_index] = current_ADC_value;
-			      ADC_index++;
-
-			      if(ADC_index >= ADC_BUFFER_SIZE)
-			      {
-			          buffer_full = true;
-			          ADC_index = 0;
-			      }
-			  }
-			  else
-			  {
-			    // Fallback
-				  ADC_index = 0;
-			  }
-
-			new_ADC_value_recieved = false;
-		}
-
-
-		if (uart2_upload_index == uart2_DMA_index - 1)
-		{
-			game_status = GAME_OVER;
-		}
 
     /* USER CODE END WHILE */
 
@@ -1050,12 +1062,17 @@ void enemy_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* s
 
 void run_dft(player_struct* player, bullet_struct* bullets, sprite_struct* sprites)
 {
-	for (uint8_t command = 0; command < (sizeof(command_freqs) - 1) ; command++)
+	// Loop through all commands and check if their frequency magnitude exceeds the threshold
+	// 0: pauze
+	// 1: beweeg links
+	// 2: beweeg rechts
+	// 3: schiet
+	for (uint8_t command = 0; (command < 4 - 1); command++)
 	{
-		float magnitude = DFT_compute_LUT(command_freqs[command]);
-
-		if (magnitude >= COMMAND_THRESHOLD)
-			command_handler(command, player, bullets, sprites);
+		// Compute the magnitude for the current command frequency range
+		// If the magnitude exceeds the threshold, execute the corresponding command
+		// if (magnitude >= COMMAND_THRESHOLD)
+		// 	command_handler(command, player, bullets, sprites);
 	}
 }
 
@@ -1064,8 +1081,43 @@ void run_dft(player_struct* player, bullet_struct* bullets, sprite_struct* sprit
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
+	if (hadc->Instance != ADC1)
+		return;
+
 	HAL_GPIO_TogglePin(LED_rood_GPIO_Port, LED_rood_Pin);
-	new_ADC_value_recieved = true;
+
+	// Copy second half of the DMA block into the circular buffer.
+	for (uint32_t i = ADC_DMA_BLOCK_SAMPLES / 2; i < ADC_DMA_BLOCK_SAMPLES; i++)
+	{
+		ADC_buffer[ADC_index] = (int)adc_dma_block[i];
+		ADC_index++;
+		if (ADC_index >= ADC_BUFFER_SIZE)
+		{
+			ADC_index = 0;
+			buffer_full = true;
+		}
+	}
+
+	// Signal main loop that a full 64-sample block has been captured.
+	adc_dma_block_ready = true;
+}
+
+void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
+{
+	if (hadc->Instance != ADC1)
+		return;
+
+	// Copy first half of the DMA block into the circular buffer.
+	for (uint32_t i = 0; i < ADC_DMA_BLOCK_SAMPLES / 2; i++)
+	{
+		ADC_buffer[ADC_index] = (int)adc_dma_block[i];
+		ADC_index++;
+		if (ADC_index >= ADC_BUFFER_SIZE)
+		{
+			ADC_index = 0;
+			buffer_full = true;
+		}
+	}
 }
 
 
