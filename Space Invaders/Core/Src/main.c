@@ -272,7 +272,14 @@ int main(void)
 					// Verstuur speler locatie
 					update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, 0b1);
 
-					if (sprite_move_clock_counter++ >= (SPRITES_MOVE_FREQ / 2))
+					// Verstuur de score
+					// In de FPGA worden de bitjes van Y achter de bitjes van X geplakt om zo een 19 bits getal te genereren.
+					// player.score is een uint16_t
+					update_FPGA(SCORE_OBJ_ID, (player.score >> 9), (player.score), 0b1);
+
+
+					// Elke
+					if (sprite_move_clock_counter++ >= (SPRITES_MOVE_FREQ / 3))
 					{
 					  sprite_move_clock_counter = 1;
 					  sprite_move_clock = true;

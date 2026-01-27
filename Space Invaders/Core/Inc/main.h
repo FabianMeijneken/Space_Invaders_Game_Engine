@@ -112,26 +112,25 @@ enum gamestates {
 
 
 // Fabian Meijneken hieronder
+#define SCORE_OBJ_ID			15
+#define DEF_SPRITES_MOVE_FREQ 	30		// Deze factor / 3 is de waarde van de klokdeler vanaf 20 Hz.
+#define BULLET_FREQUENCY		10		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY == 1;
+#define UART2_TX_BUFFER_SIZE	16		// De grootte van de UART TX buffer (hoeveelheid berichten)
 
 #define PLAYER_X_START 			320
 #define PLAYER_Y_START 			440
 #define PLAYER_MOVE_SPEED 		2
 #define MAX_PLAYER_BULLET_COUNT 1
-#define SCORE_PER_ENEMIE		40		// 10 punten per enemie die je doodschiet.
-#define BULLET_FREQUENCY		10		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY == 1;
-#define DEF_SPRITES_MOVE_FREQ 	15		// Deze factor / 2 is de waarde van de klokdeler vanaf 20 Hz.
 
+
+#define SCORE_PER_ENEMIE		40		// 10 punten per enemie die je doodschiet.
 #define BULLET_BREEDTE 			4
 #define BULLET_LENGTE 			9
-
 #define SPELER_BREEDTE 			20
 #define SPELER_LENGTE 			22
 
 
 #define COMMAND_THRESHOLD		10		// De maximale geaccepteerde frequentie error in de input handler. todo: goedzetten. (bram vragen)
-
-#define UART2_TX_BUFFER_SIZE	16		// De grootte van de UART TX buffer (hoeveelheid berichten)
-
 #define game_over_flicker_duration 11
 
 
