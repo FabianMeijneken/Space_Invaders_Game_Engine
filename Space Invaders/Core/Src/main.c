@@ -302,6 +302,9 @@ int main(void)
 						update_FPGA(rij, (sprites + ((rij-1) * 6))->X_pos, (sprites + ((rij-1) * 6))->Y_pos, render_bits);
 					}
 
+					// Zet de "random seed" naar de runtime in miliseconds, deze is max 32 bits.
+					// Dit geeft een meer random waarde.
+					srand(HAL_GetTick());
 
 					// Laat een random enemy een bullet schieten
 					if ((rand() % BULLET_FREQUENCY) == 1)
