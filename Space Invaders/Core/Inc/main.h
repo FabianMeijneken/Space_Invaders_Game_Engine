@@ -81,7 +81,6 @@ enum gamestates {
 	GAME_WON
 };
 
-#define KLOKDELER_SPRITE_UPDATE 2				// Deze deelt een 20 Hz klok. met een waar van 10 bewegen de sprites op 2 Hz.
 
 
 // Finn van Zijverden hieronder
@@ -93,19 +92,19 @@ enum gamestates {
 
 
 // Kim lobstein hieronder
-#define MAX_SPRITE_Y 			250
-#define MAX_X_SPRITES 			600
+#define MAX_Y_SPRITES 			400
+#define MAX_X_SPRITES 			550
 #define MIN_X_SPRITES 			10
 
 #define SPRITES_PER_RIJ 		6
 #define AANTAL_RIJEN_SPRITES 	5
-#define SPRITE_X_MOVE_SPEED 	10
-#define SPRITE_Y_MOVE_SPEED 	50
+#define SPRITE_X_MOVE_SPEED		5		// Deze variable bepaald de x_move_speed. Dit is geen define omdat de sprites naarmate het spel vordert sneller gaan bewegen.
+#define SPRITE_Y_MOVE_SPEED 	20
 
-#define SPRITES_X_OFFSET		15		// Start X van sprite linksboven
-#define SPRITES_Y_OFFSET		36		// Start Y van sprite linksboven
-#define SPRITES_X_AFSTAND		40		// Afstand tussen sprites (X) (begin tot volgende begin)
-#define SPRITES_Y_AFSTAND		10		// Afstand tussen sprites (Y) (begin tot volgende begin)
+#define SPRITES_X_OFFSET		12		// Start X van sprite linksboven
+#define SPRITES_Y_OFFSET		30		// Start Y van sprite linksboven
+#define SPRITES_X_AFSTAND		36 		// NIET VERANDEREN ZONDER FPGA TE VERANDEREN // (32 + 4)  Afstand tussen sprites (X) (begin tot volgende begin)
+#define SPRITES_Y_AFSTAND		42		// (32 + 10) Afstand tussen sprites (Y) (begin tot volgende begin)
 
 #define SPRITE_LENGTE 			32
 #define SPRITE_BREEDTE 			32
@@ -113,12 +112,14 @@ enum gamestates {
 
 
 // Fabian Meijneken hieronder
+
 #define PLAYER_X_START 			320
 #define PLAYER_Y_START 			440
 #define PLAYER_MOVE_SPEED 		2
 #define MAX_PLAYER_BULLET_COUNT 1
 #define SCORE_PER_ENEMIE		40		// 10 punten per enemie die je doodschiet.
-#define BULLET_FREQUENCY		3		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY == 1;
+#define BULLET_FREQUENCY		10		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY == 1;
+#define DEF_SPRITES_MOVE_FREQ 	15		// Deze factor / 2 is de waarde van de klokdeler vanaf 20 Hz.
 
 #define BULLET_BREEDTE 			4
 #define BULLET_LENGTE 			9
@@ -130,6 +131,8 @@ enum gamestates {
 #define COMMAND_THRESHOLD		10		// De maximale geaccepteerde frequentie error in de input handler. todo: goedzetten. (bram vragen)
 
 #define UART2_TX_BUFFER_SIZE	16		// De grootte van de UART TX buffer (hoeveelheid berichten)
+
+#define game_over_flicker_duration 11
 
 
 // Bram Laurens hieronder
@@ -192,7 +195,6 @@ void bulletUpdater(bullet_struct* bullets, player_struct* player);
 
 //----- Kim Lobstein -----//
 void move_sprites(sprite_struct* sprites);
-void collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_struct* bullets, uint8_t bulletIndex, uint8_t BB);
 void collision_check_all_bullets(sprite_struct* sprites, player_struct* player, bullet_struct* bullets);
 //----- Einde Kim Lobstein -----//
 
@@ -201,6 +203,7 @@ void collision_check_all_bullets(sprite_struct* sprites, player_struct* player, 
 void player_move(player_struct* player, char move_left);
 void player_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite);
 void enemy_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite, int sprite_num);
+int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_struct* bullets, uint8_t bulletIndex);				//BB 0 voor omhoog, 1 voor omlaag
 
 //----- Einde Fabian Meijneken -----//
 
