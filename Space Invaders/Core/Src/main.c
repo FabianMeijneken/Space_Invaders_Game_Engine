@@ -61,7 +61,8 @@ DMA_HandleTypeDef hdma_usart2_tx;
 /* USER CODE BEGIN PV */
 // Game variables
 volatile bool update_tick_20hz = false;				// Globaal gedefinieerd omdat deze ook in de it.c wordt gebruikt.
-enum gamestates game_status = GAME_RESET;
+volatile enum gamestates game_status = GAME_RESET;
+
 const bullet_struct bullet_empty = {
 	.X_pos = 10,
 	.Y_pos = 10,
@@ -296,6 +297,7 @@ int main(void)
 				if (update_tick_20hz)
 				{
 					HAL_GPIO_TogglePin(LED_oranje_GPIO_Port, LED_oranje_Pin);
+					game_done_flicker_count = 0;			// This is needed to reset the flicker count when coming out of the pauze state.
 
 					//----- DFT update -----//
 					run_dft(&player, &bullets, &sprites);
@@ -483,15 +485,8 @@ int main(void)
 					else
 						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b0);
 
-					if (game_done_flicker_count >= game_over_flicker_duration)
-					{
-						game_done_flicker_count = 0;
-						game_status = GAME_RESET;
-					}
-
 					game_done_clock = false;
 				}
-
 				break;
 
 		}

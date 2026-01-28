@@ -16,7 +16,8 @@
 
 // External variables
 extern int ADC_buffer[ADC_BUFFER_SIZE];
-extern enum gamestates game_status;
+extern volatile enum gamestates game_status;
+extern volatile bool button_command_override;
 
 
 // Defines
