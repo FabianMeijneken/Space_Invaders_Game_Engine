@@ -1149,10 +1149,10 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 					if (--aantal_levende_sprites == 0)
 					{
 						game_status = GAME_WON;
-						player.lives++;
+						player->lives++;
 
-						if (player.lives > 3)
-							player.lives = 3;
+						if (player->lives > 3)
+							player->lives = 3;
 
 						return 1;
 					}
