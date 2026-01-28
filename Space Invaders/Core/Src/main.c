@@ -946,6 +946,13 @@ void move_sprites(sprite_struct* sprites){
 			}
 		}
 	}
+	else
+	{
+		for (uint8_t k = 0; k <  AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ; k++)
+		{
+				(sprites + k)->X_pos += links_rechts ? SPRITE_X_MOVE_SPEED : -SPRITE_X_MOVE_SPEED;				// Ternary operator ;)
+		}
+	}
 }
 
 
