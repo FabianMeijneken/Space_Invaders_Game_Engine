@@ -409,11 +409,6 @@ int main(void)
 
 				if (game_done_clock)
 				{
-					player.lives++;
-
-					if (player.lives > 3)
-						player.lives = 3;
-
 					// Verstuur speler locatie (voor een update van de health)
 					update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, (((player.lives & 0b11) << 1) | 0b1));
 
@@ -1154,6 +1149,11 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 					if (--aantal_levende_sprites == 0)
 					{
 						game_status = GAME_WON;
+						player.lives++;
+
+						if (player.lives > 3)
+							player.lives = 3;
+
 						return 1;
 					}
 
