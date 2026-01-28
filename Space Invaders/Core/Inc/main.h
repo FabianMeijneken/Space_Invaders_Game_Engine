@@ -105,7 +105,7 @@ enum gamestates {
 #define SPRITE_X_MOVE_SPEED		5		// Deze variable bepaald de x_move_speed. Dit is geen define omdat de sprites naarmate het spel vordert sneller gaan bewegen.
 #define SPRITE_Y_MOVE_SPEED 	20
 
-#define SPRITES_X_OFFSET		12		// Start X van sprite linksboven
+#define SPRITES_X_OFFSET		23		// Start X van sprite linksboven
 #define SPRITES_Y_OFFSET		30		// Start Y van sprite linksboven
 #define SPRITES_X_AFSTAND		36 		// NIET VERANDEREN ZONDER FPGA TE VERANDEREN // (32 + 4)  Afstand tussen sprites (X) (begin tot volgende begin)
 #define SPRITES_Y_AFSTAND		42		// (32 + 10) Afstand tussen sprites (Y) (begin tot volgende begin)
@@ -116,9 +116,9 @@ enum gamestates {
 
 
 // Fabian Meijneken hieronder
-#define SCORE_OBJ_ID			15
+#define SYSTEM_OBJ_ID			15
 #define DEF_SPRITES_MOVE_FREQ 	30		// Deze factor / 3 is de waarde van de klokdeler vanaf 20 Hz.
-#define BULLET_FREQUENCY		10		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY == 1;
+#define BULLET_FREQUENCY		300		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY == 1;
 #define UART2_TX_BUFFER_SIZE	16		// De grootte van de UART TX buffer (hoeveelheid berichten)
 
 #define PLAYER_X_START 			320
@@ -134,8 +134,8 @@ enum gamestates {
 #define SPELER_LENGTE 			22
 
 
-#define COMMAND_THRESHOLD		10		// De maximale geaccepteerde frequentie error in de input handler. todo: goedzetten. (bram vragen)
-#define game_over_flicker_duration 11
+#define game_over_flicker_duration 	11
+#define game_won_flicker_duration 	10
 
 
 // Bram Laurens hieronder

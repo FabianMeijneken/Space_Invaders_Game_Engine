@@ -21,6 +21,7 @@
 
 // TODO At collision, send command for only that row. This saves uart size, maby that removes the stutter on colision?
 // TODO Check voor game ending.
+// TODO Score reset niet als je het spel hard reset (door knopje op STM)
 
 
 /* USER CODE END Header */
@@ -94,7 +95,8 @@ int ADC_buffer[ADC_BUFFER_SIZE];
 volatile bool buffer_full = false;
 volatile uint32_t ADC_index = 0;
 
-uint8_t game_over_flicker_count = 0;
+uint8_t game_done_flicker_count = 0;
+
 
 /* USER CODE END PV */
 
@@ -129,8 +131,8 @@ int main(void)
 	char sprite_move_clock_counter = 1;
 	bool sprite_move_clock = false;
 
-	char game_over_clock_counter = 1;
-	bool game_over_clock = false;
+	char game_done_clock_counter = 1;
+	bool game_done_clock = false;
 
 	// Player init:
 	player_struct player;
@@ -214,23 +216,22 @@ int main(void)
 		{
 			// Wordt gebruikt aan het begin van het spel, reset alle posities en waardes.
 			case GAME_RESET:
-				// Reset clock
+				//----- Reset clock -----//
 				sprite_move_clock_counter = 1;
 				sprite_move_clock = false;
 
-				// Reset sprite movement frequency
+				//----- Reset sprite movement frequency -----//
 				SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;
 
-				// Reset player
+				//----- Reset player -----//
 				player.obj_ID =					0;
 				player.X_pos = 					PLAYER_X_START;
 				player.Y_pos = 					PLAYER_Y_START;
 				player.speed = 					PLAYER_MOVE_SPEED;
 				player.active_bullet_count = 	0;
 				player.lives = 					3;
-				player.score = 					0;
 
-				// Reset Sprites
+				//----- Reset Sprites -----//
 				for (uint8_t rij = 0; rij < (AANTAL_RIJEN_SPRITES); rij++)
 				{
 					for (uint8_t kolom = 0; kolom < (SPRITES_PER_RIJ); kolom ++)
@@ -243,29 +244,36 @@ int main(void)
 
 				}
 
-				// Reset Bullets
+				//----- Reset Bullets -----//
 				for (int i = 0; i < MAX_BULLET_AMOUNT; i++)
 				{
 					bullets[i] = bullet_empty;
 				}
 
 
-
-				// Verstuur kogel locaties
+				//----- Verstuur kogel locaties -----//
 				for (int i = 0; i < MAX_BULLET_AMOUNT; i++)
 				{
-					#ifdef OUTPUT_FPGA
 					update_FPGA((6 + i),
 								(bullets + i)->X_pos,
 								(bullets + i)->Y_pos,
 								((bullets + i)->richting << 1) | (bullets + i)->actief		// LSB is nu "richting", bitje links daarvan is "actief"
 								);
-					#endif
+				}
+
+				//----- Verstuur sprite locaties -----//
+				// Dit loopt vanaf 1 aangezien de player ID 1 heeft.
+				for (int rij = 1; rij <= AANTAL_RIJEN_SPRITES; rij++)
+				{
+					uint8_t render_bits = 0b0;
+					for (int i = 0; i < SPRITES_PER_RIJ; i++)
+						render_bits |= ((sprites + ((rij-1) * 6) + i) -> alive) << (SPRITES_PER_RIJ - 1 - i);
+
+					update_FPGA(rij, (sprites + ((rij-1) * 6))->X_pos, (sprites + ((rij-1) * 6))->Y_pos, render_bits);
 				}
 
 
 				game_status = GAME_STARTING;
-
 				break;
 
 
@@ -297,25 +305,20 @@ int main(void)
 					// Verstuur kogel locaties
 					for (int i = 0; i < MAX_BULLET_AMOUNT; i++)
 					{
-						#ifdef OUTPUT_FPGA
 						update_FPGA((bullets + i)->object_ID,
 									(bullets + i)->X_pos,
 									(bullets + i)->Y_pos,
 									((bullets + i)->richting << 1) | (bullets + i)->actief		// LSB is nu "richting", bitje links daarvan is "actief"
 									);	
-						#endif
 					}
 
 					// Verstuur speler locatie
-					#ifdef OUTPUT_FPGA
-					update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, 0b1);
-					#endif
+					update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, (((player.lives & 0b11) << 1) | 0b1));
+
 					// Verstuur de score
 					// In de FPGA worden de bitjes van Y achter de bitjes van X geplakt om zo een 19 bits getal te genereren.
 					// player.score is een uint16_t
-					#ifdef OUTPUT_FPGA
-					update_FPGA(SCORE_OBJ_ID, (player.score >> 9), (player.score), 0b1);
-					#endif
+					update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b0);
 
 
 					// Elke
@@ -340,15 +343,14 @@ int main(void)
 
 
 					// Verstuur sprite locaties
+					// Dit loopt vanaf 1 aangezien de player ID 1 heeft.
 					for (int rij = 1; rij <= AANTAL_RIJEN_SPRITES; rij++)
 					{
 						uint8_t render_bits = 0b0;
 						for (int i = 0; i < SPRITES_PER_RIJ; i++)
 							render_bits |= ((sprites + ((rij-1) * 6) + i) -> alive) << (SPRITES_PER_RIJ - 1 - i);
 
-						#ifdef OUTPUT_FPGA
 						update_FPGA(rij, (sprites + ((rij-1) * 6))->X_pos, (sprites + ((rij-1) * 6))->Y_pos, render_bits);
-						#endif
 					}
 
 					// Zet de "random seed" naar de runtime in miliseconds, deze is max 32 bits.
@@ -372,43 +374,67 @@ int main(void)
 
 			// Wordt gebruikt als de speler heeft gewonnen.
 			case GAME_WON :
-				// TODO: GAME_WON actie maken
-				break;
-
-			case GAME_OVER :
 				if (update_tick_20hz)
 				{
-					if (game_over_clock_counter++ >= 10)
+					if (game_done_clock_counter++ >= 10)
 					{
-						game_over_clock_counter = 1;
-						game_over_clock = true;
+						game_done_clock_counter = 1;
+						game_done_clock = true;
 					}
 
 					update_tick_20hz = false;
 				}
 
-				if (game_over_clock)
+				if (game_done_clock)
 				{
-					if (game_over_flicker_count++ % 2)
-					#ifdef OUTPUT_FPGA
-						update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, 0b1);
-					#endif
+					// Flicker de game_won bit (render bit 0b100)
+					if (game_done_flicker_count++ % 2)
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b100);
 					else
-					#ifdef OUTPUT_FPGA
-						update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, 0b0);
-					#endif
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b0);
 
-					if (game_over_flicker_count >= game_over_flicker_duration)
+					if (game_done_flicker_count >= game_won_flicker_duration)
 					{
 						HAL_Delay(1000);
-						game_over_flicker_count = 0;
+						game_done_flicker_count = 0;
 						game_status = GAME_RESET;
-
 					}
 
-					game_over_clock = false;
+					game_done_clock = false;
+				}
+				break;
+
+			case GAME_OVER :
+				if (update_tick_20hz)
+				{
+					if (game_done_clock_counter++ >= 10)
+					{
+						game_done_clock_counter = 1;
+						game_done_clock = true;
+					}
+
+					update_tick_20hz = false;
 				}
 
+				if (game_done_clock)
+				{
+					player.score = 0;
+
+					// Flicker de game_over bit (render bit 0b10)
+					if (game_done_flicker_count++ % 2)
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b10);
+					else
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b0);
+
+					if (game_done_flicker_count >= game_over_flicker_duration)
+					{
+						HAL_Delay(1000);
+						game_done_flicker_count = 0;
+						game_status = GAME_RESET;
+					}
+
+					game_done_clock = false;
+				}
 				break;
 
 			case GAME_PAUSED :
@@ -875,11 +901,11 @@ void move_sprites(sprite_struct* sprites){
 
 	// Check of je de kant al hebt geraakt.
 	for (uint8_t i = 0; i < SPRITES_PER_RIJ; i++){
-		if ((((sprites + i)->X_pos >= MAX_X_SPRITES)||((sprites + i)->X_pos <= MIN_X_SPRITES)) && ((sprites + i)->alive == 1))			//als een levende sprite de rechter rand raakt:
+		if ((((sprites + i)->X_pos >= MAX_X_SPRITES)||((sprites + i)->X_pos <= MIN_X_SPRITES)) && ((sprites + i)->alive == 1))			//als een levende sprite de linker- of rechter rand raakt:
 		{
 			links_rechts = !links_rechts;																								//draai dan de beweegrichting om
 
-			for (int8_t k = (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES) - 1; k >= 0; k--)														//en beweeg de sprites naar beneden
+			for (int8_t k = (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES) - 1; k >= 0; k--)													//en beweeg de sprites naar beneden
 			{
 				if ((sprites + k)->alive
 					&& (sprites + k)->Y_pos + SPRITE_Y_MOVE_SPEED >= MAX_Y_SPRITES)
@@ -1038,7 +1064,9 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 			&& (bullets + bulletIndex)->Y_pos + BULLET_LENGTE <= player->Y_pos + SPELER_LENGTE		// Check of de kogel y binnen de speler y valt
 		   )
 		{
-			game_status = GAME_OVER;
+			if (--(player->lives) == 0)
+				game_status = GAME_OVER;
+
 			return 1;
 		}
 	}
