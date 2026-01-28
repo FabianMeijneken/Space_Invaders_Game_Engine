@@ -72,12 +72,11 @@ const bullet_struct bullet_empty = {
 	.richting = 0
 };
 
-// Sprite move variables
-uint8_t links_rechts = 1; 					// Deze variable geeft aan of de sprites naar links of rechts bewegen. (0 voor links, 1 voor rechts)
-int SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;				// Deze deelt een 20 Hz klok. met een waar van 10 bewegen de sprites op 2 Hz.
-int aantal_sprites_dood = 0;
+// Sprite variables
+uint8_t links_rechts = 1; 													// Deze variable geeft aan of de sprites naar links of rechts bewegen. (0 voor links, 1 voor rechts)
+int SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;								// Deze deelt een 20 Hz klok. met een waar van 10 bewegen de sprites op 2 Hz.
 
-
+int aantal_levende_sprites = SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES;		// Deze variable houdt de hoeveelheid levende sprites bij.
 
 // UART variables
 uint32_t tx_buffer[UART2_TX_BUFFER_SIZE];
@@ -221,9 +220,10 @@ int main(void)
 				sprite_move_clock_counter = 1;
 				sprite_move_clock = false;
 
-				//----- Reset sprite movement variables -----//
+				//----- Reset sprite  variables -----//
 				SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;
-				aantal_sprites_dood = 0;
+				aantal_levende_sprites = SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES;
+
 
 				//----- Reset player -----//
 				player.obj_ID =					0;
@@ -323,7 +323,7 @@ int main(void)
 					update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b0);
 
 
-					// Elke
+					// Genereer de sprite_move klok. Dit wordt gedaan met een instelbare frequentie.
 					if (sprite_move_clock_counter++ >= (SPRITES_MOVE_FREQ / 3))
 					{
 					  sprite_move_clock_counter = 1;
@@ -361,11 +361,26 @@ int main(void)
 
 					// Laat een random enemy een bullet schieten
 					if ((rand() % BULLET_FREQUENCY) == 1)
-						sprite_shoow(&player,
+					{
+						
+						// Maak een array met alle levende sprites daarin.
+						int alive_sprites[AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ];
+
+						for (int i = 0; i < (AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ); i++)
+						{
+							alive_sprites[i] = sprites[i].alive;
+						}
+
+						int random_sprite = alive_sprites[(rand() % (aantal_levende_sprites - 1))];
+
+						// Schiet een bullet vanaf een random levende sprite.
+						sprite_shoot(&player,
 									bullets,
 									sprites,
-									(rand() % ((AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ) - 1))
+									random_sprite
 									);
+					}
+
 
 
 					sprite_move_clock = false;
@@ -1020,7 +1035,7 @@ void player_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* 
  *
  * @return void
  */
-void sprite_shoow(player_struct* player, bullet_struct* bullets, sprite_struct* sprite, int sprite_num)
+void sprite_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite, int sprite_num)
 {
     // shot by user is hier false. Er zal vanaf sprite x (sprite_num) een bullet worden geschoten.
 	BulletBeheer(bullets, 1, 1, false, player, sprite, sprite_num);
@@ -1084,12 +1099,11 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 				   )
 				{
 					// Controleer of alle sprites dood zijn
-					if (++aantal_sprites_dood == (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES))
+					if (--aantal_levende_sprites == 0)
 					{
 						game_status = GAME_WON;
 						return 1;
 					}
-
 
 					// Er is een collision, maak de sprite dood en verwijder de kogel
 					(sprites + i)->alive = 0;
