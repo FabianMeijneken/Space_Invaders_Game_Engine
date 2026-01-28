@@ -20,7 +20,7 @@
 // TODO At collision, send command for only that row. This saves uart size, maby that removes the stutter on colision?
 // TODO fix sprites moving too far to the left
 // TODO fix player being able to go offscreen on the right.
-// TODO health takes 2 per hit.
+// TODO player controls flip when hitting left wall.
 
 // TODO low prio, UART can lose position when STM32 resets during UART command.
 
@@ -78,7 +78,7 @@ volatile bool button_command_override = false;
 
 
 // Sprite variables
-uint8_t links_rechts = 1; 													// Deze variable geeft aan of de sprites naar links of rechts bewegen. (0 voor links, 1 voor rechts)
+uint8_t links_rechts; 													// Deze variable geeft aan of de sprites naar links of rechts bewegen. (0 voor links, 1 voor rechts)
 int SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;								// Deze deelt een 20 Hz klok. met een waar van 10 bewegen de sprites op 2 Hz.
 
 int aantal_levende_sprites = SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES;		// Deze variable houdt de hoeveelheid levende sprites bij.
@@ -229,6 +229,7 @@ int main(void)
 				//----- Reset sprite  variables -----//
 				SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;
 				aantal_levende_sprites = SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES;
+				uint8_t links_rechts = 1;
 
 
 				//----- Reset player -----//
