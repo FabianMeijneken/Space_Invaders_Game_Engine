@@ -180,7 +180,7 @@ void command_handler(uint8_t command, player_struct* player, bullet_struct* bull
 		case 0:
 			if (game_status == GAME_RUNNING)
 				game_status = GAME_PAUSED;
-			if (game_status == GAME_PAUSED)
+			else if (game_status == GAME_PAUSED)
 				game_status = GAME_RUNNING;
 			break;
 
