@@ -99,7 +99,7 @@ enum gamestates {
 
 
 
-// Finn van Zijverden hieronder
+//----- Finn van Zijverden hieronder -----//
 #define MAX_BULLET_AMOUNT 		5
 #define BULLET_MOVE_SPEED 		10
 #define BULLET_Y_MIN			20
@@ -107,17 +107,17 @@ enum gamestates {
 
 
 
-// Kim lobstein hieronder
+//----- Kim lobstein hieronder -----//
 #define MAX_Y_SPRITES 			400
 #define MAX_X_SPRITES 			550
-#define MIN_X_SPRITES 			10
+#define MIN_X_SPRITES 			50
 
 #define SPRITES_PER_RIJ 		6
 #define AANTAL_RIJEN_SPRITES 	5
 #define SPRITE_X_MOVE_SPEED		5		// Deze variable bepaald de x_move_speed. Dit is geen define omdat de sprites naarmate het spel vordert sneller gaan bewegen.
 #define SPRITE_Y_MOVE_SPEED 	20
 
-#define SPRITES_X_OFFSET		23		// Start X van sprite linksboven
+#define SPRITES_X_OFFSET		50		// Start X van sprite linksboven
 #define SPRITES_Y_OFFSET		30		// Start Y van sprite linksboven
 #define SPRITES_X_AFSTAND		36 		// NIET VERANDEREN ZONDER FPGA TE VERANDEREN // (32 + 4)  Afstand tussen sprites (X) (begin tot volgende begin)
 #define SPRITES_Y_AFSTAND		42		// (32 + 10) Afstand tussen sprites (Y) (begin tot volgende begin)
@@ -127,32 +127,37 @@ enum gamestates {
 
 
 
-// Fabian Meijneken hieronder
+//----- Fabian Meijneken hieronder -----//
+// Game specific
 #define SYSTEM_OBJ_ID			15
 #define DEF_SPRITES_MOVE_FREQ 	30		// Deze factor / 3 is de waarde van de klokdeler vanaf 20 Hz.
-#define BULLET_FREQUENCY		30		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY == 1;
+#define BULLET_FREQUENCY		10		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY == 1;
 #define UART2_TX_BUFFER_SIZE	16		// De grootte van de UART TX buffer (hoeveelheid berichten)
 
+// Player
 #define PLAYER_X_START 			320
 #define PLAYER_Y_START 			440
-#define PLAYER_X_MIN			10
-#define PLAYER_X_MAX			550
-#define PLAYER_MOVE_SPEED 		8
-#define MAX_PLAYER_BULLET_COUNT 2
-
-
-#define SCORE_PER_ENEMIE		40		// 10 punten per enemie die je doodschiet.
-#define BULLET_BREEDTE 			4
-#define BULLET_LENGTE 			9
+#define PLAYER_X_MIN			5
+#define PLAYER_X_MAX			600
 #define SPELER_BREEDTE 			20
 #define SPELER_LENGTE 			22
 
+#define PLAYER_MOVE_SPEED 		8
+#define MAX_PLAYER_BULLET_COUNT 2
 
+// Enemy
+#define SCORE_PER_ENEMIE		40		// 10 punten per enemie die je doodschiet.
+
+// Bullet
+#define BULLET_BREEDTE 			4
+#define BULLET_LENGTE 			9
+
+// Game end durations
 #define game_over_flicker_duration 	11
 #define game_won_flicker_duration 	10
 
 
-// Bram Laurens hieronder
+//----- Bram Laurens hieronder -----//
 #define ADC_BUFFER_SIZE			200
 
 
