@@ -911,39 +911,43 @@ void bulletUpdater(bullet_struct* bullets, player_struct* player)
 //-------------------- Kim Lobstein --------------------//
 
 void move_sprites(sprite_struct* sprites){
-	// TODO: herschrijven zodat ook de bovenste enemies als eerste dood kunnen gaan.
-	// Alleen de bovenste rij wordt gechecked of ze aan de zijkant zijn.
+	bool sprite_raakt_rand = false;
 
-	// Nu is het zo dat de check of je de kant hebt geraakt wordt gedaan met ALLEEN de bovenste sprites.
-
-	// Check of je de kant al hebt geraakt.
-	for (uint8_t i = 0; i < SPRITES_PER_RIJ; i++){
-		if ((((sprites + i)->X_pos >= MAX_X_SPRITES)||((sprites + i)->X_pos <= MIN_X_SPRITES)) && ((sprites + i)->alive == 1))			//als een levende sprite de linker- of rechter rand raakt:
+	for (uint8_t i = 0; i < AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ; i++){
+		if (
+			(((sprites + i)->X_pos >= MAX_X_SPRITES)
+			|| (((sprites + i)->X_pos + SPRITE_BREEDTE) <= MIN_X_SPRITES))
+			&& ((sprites + i)->alive == 1)
+			)
 		{
-			links_rechts = !links_rechts;																								//draai dan de beweegrichting om
-
-			for (int8_t k = (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES) - 1; k >= 0; k--)													//en beweeg de sprites naar beneden
-			{
-				if ((sprites + k)->alive
-					&& (sprites + k)->Y_pos + SPRITE_Y_MOVE_SPEED >= MAX_Y_SPRITES)
-				{
-					// Game over
-					game_status = GAME_OVER;
-
-					return;
-				}
-				else
-				{
-					(sprites + k)->Y_pos = (sprites + k)->Y_pos + SPRITE_Y_MOVE_SPEED;													//sprites x pixels naar beneden
-				}
-			}
+			sprite_raakt_rand = true;
+			break;
 		}
 	}
 
-	//beweeg vervolgens alle sprites in de ingestelde richting
-	for (uint8_t j = 0; j < (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES); j++)
-		(sprites + j)->X_pos += links_rechts ? SPRITE_X_MOVE_SPEED : -SPRITE_X_MOVE_SPEED;				// Ternary operator ;)
+	if (sprite_raakt_rand)
+	{
+		links_rechts = !links_rechts;
+
+		for (uint8_t k = 0; k <  AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ; k++)
+		{
+			if ((sprites + k)->alive
+				&& (sprites + k)->Y_pos + SPRITE_Y_MOVE_SPEED >= MAX_Y_SPRITES)
+			{
+				// Game over
+				game_status = GAME_OVER;
+
+				return;
+			}
+			else
+			{
+				(sprites + k)->Y_pos = (sprites + k)->Y_pos + SPRITE_Y_MOVE_SPEED;
+				(sprites + k)->X_pos += links_rechts ? SPRITE_X_MOVE_SPEED : -SPRITE_X_MOVE_SPEED;				// Ternary operator ;)
+			}
+		}
+	}
 }
+
 
 
 // Functie die voor alle actieve bullets een collision check uitvoert.
