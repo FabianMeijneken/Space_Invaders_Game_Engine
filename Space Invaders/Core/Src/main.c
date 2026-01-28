@@ -13,7 +13,7 @@
   * in the root directory of this software component.
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
-  * @author 		: Finn van Zijverden, Kim Lobstein, Fabian Meijneken
+  * @author 		: Finn van Zijverden, Kim Lobstein, Fabian Meijneken, Bram Laurens
   ******************************************************************************
   */
 
@@ -21,7 +21,11 @@
 
 // TODO At collision, send command for only that row. This saves uart size, maby that removes the stutter on colision?
 // TODO Lage prio - Score reset niet als je het spel hard reset (door knopje op STM)
-// TODO dode sprites schieten bullets
+// TODO Dode sprites schieten bullets
+// TODO fix sprites moving too far to the left
+// TODO fix player being able to go offscreen on the right.
+// TODO buttons as overwrite of DFT
+// TODO score doesn't reset at first run
 
 
 /* USER CODE END Header */
@@ -72,6 +76,8 @@ const bullet_struct bullet_empty = {
 	.richting = 0
 };
 
+uint8_t game_done_flicker_count = 0;
+
 // Sprite variables
 uint8_t links_rechts = 1; 													// Deze variable geeft aan of de sprites naar links of rechts bewegen. (0 voor links, 1 voor rechts)
 int SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;								// Deze deelt een 20 Hz klok. met een waar van 10 bewegen de sprites op 2 Hz.
@@ -95,7 +101,6 @@ int ADC_buffer[ADC_BUFFER_SIZE];
 volatile bool buffer_full = false;
 volatile uint32_t ADC_index = 0;
 
-uint8_t game_done_flicker_count = 0;
 
 
 /* USER CODE END PV */
@@ -136,6 +141,7 @@ int main(void)
 
 	// Player init:
 	player_struct player;
+	player.score = 0;
 
 	// Sprite init:
 	sprite_struct sprites[SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES];
