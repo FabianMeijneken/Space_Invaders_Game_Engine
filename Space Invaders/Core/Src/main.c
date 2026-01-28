@@ -341,9 +341,6 @@ int main(void)
 					// Update sprite locatie
 					move_sprites(sprites);
 
-					player_shoot(&player, bullets, sprites);
-
-
 					// Verstuur sprite locaties
 					// Dit loopt vanaf 1 aangezien de player ID 1 heeft.
 					for (int rij = 1; rij <= AANTAL_RIJEN_SPRITES; rij++)
