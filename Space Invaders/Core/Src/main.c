@@ -469,6 +469,10 @@ int main(void)
 			case GAME_PAUSED :
 				if (update_tick_20hz)
 				{
+
+					//----- DFT update -----//
+					run_dft(&player, &bullets, &sprites);
+
 					if (game_done_clock_counter++ >= 10)
 					{
 						game_done_clock_counter = 1;
