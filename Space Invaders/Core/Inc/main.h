@@ -118,7 +118,7 @@ enum gamestates {
 // Fabian Meijneken hieronder
 #define SYSTEM_OBJ_ID			15
 #define DEF_SPRITES_MOVE_FREQ 	30		// Deze factor / 3 is de waarde van de klokdeler vanaf 20 Hz.
-#define BULLET_FREQUENCY		300		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY == 1;
+#define BULLET_FREQUENCY		30		// Hoe hoger, hoe minder bullets: ... % BULLET_FREQUENCY == 1;
 #define UART2_TX_BUFFER_SIZE	16		// De grootte van de UART TX buffer (hoeveelheid berichten)
 
 #define PLAYER_X_START 			320
