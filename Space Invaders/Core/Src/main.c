@@ -229,7 +229,7 @@ int main(void)
 				//----- Reset sprite  variables -----//
 				SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;
 				aantal_levende_sprites = SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES;
-				uint8_t links_rechts = 1;
+				links_rechts = 1;
 
 
 				//----- Reset player -----//
@@ -238,7 +238,6 @@ int main(void)
 				player.Y_pos = 					PLAYER_Y_START;
 				player.speed = 					PLAYER_MOVE_SPEED;
 				player.active_bullet_count = 	0;
-				player.lives = 					3;
 
 				//----- Reset Sprites -----//
 				for (uint8_t rij = 0; rij < (AANTAL_RIJEN_SPRITES); rij++)
@@ -410,6 +409,15 @@ int main(void)
 
 				if (game_done_clock)
 				{
+					player.lives++;
+
+					if (player.lives > 3)
+						player.lives = 3;
+
+					// Verstuur speler locatie (voor een update van de health)
+					update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, (((player.lives & 0b11) << 1) | 0b1));
+
+
 					// Flicker de game_won bit (render bit 0b100)
 					if (game_done_flicker_count++ % 2)
 						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b100);
@@ -442,6 +450,10 @@ int main(void)
 				if (game_done_clock)
 				{
 					player.score = 0;
+					player.lives = 3;
+
+					// Verstuur speler locatie (voor een update van de health)
+					update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, (((player.lives & 0b11) << 1) | 0b1));
 
 					// Flicker de game_over bit (render bit 0b10)
 					if (game_done_flicker_count++ % 2)
