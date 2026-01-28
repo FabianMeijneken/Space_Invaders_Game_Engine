@@ -22,6 +22,7 @@
 // TODO At collision, send command for only that row. This saves uart size, maby that removes the stutter on colision?
 // TODO Check voor game ending.
 // TODO Score reset niet als je het spel hard reset (door knopje op STM)
+// TODO dode sprites schieten bullets
 
 
 /* USER CODE END Header */
@@ -75,6 +76,7 @@ const bullet_struct bullet_empty = {
 // Sprite move variables
 uint8_t links_rechts = 1; 					// Deze variable geeft aan of de sprites naar links of rechts bewegen. (0 voor links, 1 voor rechts)
 int SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;				// Deze deelt een 20 Hz klok. met een waar van 10 bewegen de sprites op 2 Hz.
+int aantal_sprites_dood = 0;
 
 
 
@@ -220,8 +222,9 @@ int main(void)
 				sprite_move_clock_counter = 1;
 				sprite_move_clock = false;
 
-				//----- Reset sprite movement frequency -----//
+				//----- Reset sprite movement variables -----//
 				SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;
+				aantal_sprites_dood = 0;
 
 				//----- Reset player -----//
 				player.obj_ID =					0;
@@ -1055,7 +1058,6 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 	// - SPELER_BREEDTE: De breedte van de speler sprite in pixels
 	// - SPELER_LENGTE: De lengte van de speler sprite in pixels
 
-
 	if ((bullets + bulletIndex)->richting)		// De kogel beweegt omlaag, check of de kogel een speler raakt.
 	{
 		if ( ((bullets + bulletIndex)->X_pos + 16 + (BULLET_BREEDTE / 2)) >= (player->X_pos + 16 - (SPELER_BREEDTE / 2))		// Rechterkant van kogel (x locatie) moet groter zijn dan linkerkant van speler (x locatie)
@@ -1082,8 +1084,17 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 					&& (bullets + bulletIndex)->Y_pos <= ((sprites + i)->Y_pos + SPRITE_LENGTE)
 				   )
 				{
+					// Controleer of alle sprites dood zijn
+					if (aantal_sprites_dood++ == (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES))
+					{
+						game_state = GAME_WON;
+						return 1;
+					}
+
+
 					// Er is een collision, maak de sprite dood en verwijder de kogel
 					(sprites + i)->alive = 0;
+
 
 					// Update score
 					player->score += SCORE_PER_ENEMIE;
