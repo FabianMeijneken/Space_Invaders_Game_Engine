@@ -19,9 +19,6 @@
 
 // TODO At collision, send command for only that row. This saves uart size, maby that removes the stutter on colision?
 // TODO fix sprites moving too far to the left
-// TODO fix player being able to go offscreen on the right.
-// TODO player controls flip when hitting left wall.
-
 // TODO low prio, UART can lose position when STM32 resets during UART command.
 
 
@@ -1026,18 +1023,20 @@ void player_move(player_struct* player, char move_left)
     // Controleer of we naar links of rechts moeten bewegen, en verander player.x hiernaar.
     if (move_left == 1)
     {
-        player->X_pos = (int16_t) (player->X_pos - player->speed);
-        // Ik gebruik hier een cast om warnings te voorkomen. Beide x en speed zijn van het type int16_t.
-        // Deze 16 bit integers worden voor de berekening beide omgezet naar een volledige integer (32 bit).
-        // Als de berekening klaar is en ze gaan terug naar en int16_t dan "kan" je data verliezen, ook al is dat niet zo.
-        // Om de compiler gerust te stellen gebruik ik dus een cast.
+    	if ((player->X_pos - player->speed) > PLAYER_X_MIN)
+            player->X_pos = (int16_t) (player->X_pos - player->speed);
+            // Ik gebruik hier een cast om warnings te voorkomen. Beide x en speed zijn van het type int16_t.
+			// Deze 16 bit integers worden voor de berekening beide omgezet naar een volledige integer (32 bit).
+			// Als de berekening klaar is en ze gaan terug naar en int16_t dan "kan" je data verliezen, ook al is dat niet zo.
+			// Om de compiler gerust te stellen gebruik ik dus een cast.
 
-        // Note: dit probleem had ook voorkomen kunnen worden door gewoon integers te gebruiken,
-        // maar ik zie dit als een mooie oefening tot het besparen van geheugen.
+			// Note: dit probleem had ook voorkomen kunnen worden door gewoon integers te gebruiken,
+			// maar ik zie dit als een mooie oefening tot het besparen van geheugen.
 
     } else
     {
-        player->X_pos = (int16_t) (player->X_pos + player->speed);
+    	if ((player->X_pos + player->speed) < PLAYER_X_MAX)
+    		player->X_pos = (int16_t) (player->X_pos + player->speed);
     }
 }
 
