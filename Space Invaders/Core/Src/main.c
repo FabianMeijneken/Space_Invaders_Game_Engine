@@ -20,12 +20,12 @@
 
 
 // TODO At collision, send command for only that row. This saves uart size, maby that removes the stutter on colision?
-// TODO Lage prio - Score reset niet als je het spel hard reset (door knopje op STM)
 // TODO Dode sprites schieten bullets
 // TODO fix sprites moving too far to the left
 // TODO fix player being able to go offscreen on the right.
 // TODO buttons as overwrite of DFT
 // TODO score doesn't reset at first run
+// TODO health takes 2 per hit.
 
 
 /* USER CODE END Header */
@@ -77,6 +77,8 @@ const bullet_struct bullet_empty = {
 };
 
 uint8_t game_done_flicker_count = 0;
+volatile bool button_command_override = false;
+
 
 // Sprite variables
 uint8_t links_rechts = 1; 													// Deze variable geeft aan of de sprites naar links of rechts bewegen. (0 voor links, 1 voor rechts)
@@ -150,33 +152,33 @@ int main(void)
 	bullet_struct bullets[MAX_BULLET_AMOUNT];
 
 
-	/* USER CODE END 1 */
+  /* USER CODE END 1 */
 
-	/* MCU Configuration--------------------------------------------------------*/
+  /* MCU Configuration--------------------------------------------------------*/
 
-	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-	HAL_Init();
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
 
-	/* USER CODE BEGIN Init */
+  /* USER CODE BEGIN Init */
 
-	/* USER CODE END Init */
+  /* USER CODE END Init */
 
-	/* Configure the system clock */
-	SystemClock_Config();
+  /* Configure the system clock */
+  SystemClock_Config();
 
-	/* USER CODE BEGIN SysInit */
+  /* USER CODE BEGIN SysInit */
 
 
-	/* USER CODE END SysInit */
+  /* USER CODE END SysInit */
 
-	/* Initialize all configured peripherals */
-	MX_GPIO_Init();
-	MX_DMA_Init();
-	MX_TIM3_Init();
-	MX_USART2_UART_Init();
-	MX_ADC1_Init();
-	MX_TIM4_Init();
-	/* USER CODE BEGIN 2 */
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_DMA_Init();
+  MX_TIM3_Init();
+  MX_USART2_UART_Init();
+  MX_ADC1_Init();
+  MX_TIM4_Init();
+  /* USER CODE BEGIN 2 */
 
 	HAL_TIM_Base_Start_IT(&htim3);		// Gebruikt voor DFT.
 	HAL_TIM_Base_Start_IT(&htim4);		// Gebruikt voor game updates.
@@ -184,6 +186,7 @@ int main(void)
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_block, ADC_DMA_BLOCK_SAMPLES);
 
 	init_LUTs();						// Initialiseer de LUTs voor de DFT.
+	init_buttons();						// initialize the buttons for command override.
 
   /* USER CODE END 2 */
 
@@ -752,17 +755,37 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, LED_groen_Pin|LED_oranje_Pin|LED_rood_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, buttons_row_0_Pin|LED_groen_Pin|LED_oranje_Pin|LED_rood_Pin
+                          |buttons_row_1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : LED_groen_Pin LED_oranje_Pin LED_rood_Pin */
-  GPIO_InitStruct.Pin = LED_groen_Pin|LED_oranje_Pin|LED_rood_Pin;
+  /*Configure GPIO pin : buttons_interrupt_Pin */
+  GPIO_InitStruct.Pin = buttons_interrupt_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(buttons_interrupt_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : buttons_col_2_Pin buttons_col_0_Pin buttons_col_1_Pin */
+  GPIO_InitStruct.Pin = buttons_col_2_Pin|buttons_col_0_Pin|buttons_col_1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : buttons_row_0_Pin LED_groen_Pin LED_oranje_Pin LED_rood_Pin
+                           buttons_row_1_Pin */
+  GPIO_InitStruct.Pin = buttons_row_0_Pin|LED_groen_Pin|LED_oranje_Pin|LED_rood_Pin
+                          |buttons_row_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -1156,29 +1179,6 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 
 
 //-------------------- Einde Fabian Meijneken --------------------//
-
-
-
-//-------------------- Bram Laurens --------------------//
-
-void run_dft(player_struct* player, bullet_struct* bullets, sprite_struct* sprites)
-{
-	// Loop through all commands and check if their frequency magnitude exceeds the threshold
-	// 0: pauze
-	// 1: beweeg links
-	// 2: beweeg rechts
-	// 3: schiet
-		for (uint8_t command = 0; (command < 4); command++)
-	{
-		float magnitude = DFT_range_peak(command_dft_list[command].frequency_min, command_dft_list[command].frequency_max);
-		if(magnitude > command_dft_list[command].threshold)
-		{
-			command_handler(command, player, bullets, sprites);
-		}
-	}
-}
-
-//-------------------- Einde Bram Laurens --------------------//
 
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)

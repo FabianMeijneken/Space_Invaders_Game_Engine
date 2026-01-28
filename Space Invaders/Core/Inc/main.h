@@ -64,18 +64,30 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-/*FPGA COMMUNICATION ENABLE*/
-#define OUTPUT_FPGA
-//#define OUTPUT_DFT_DEBUG
-
+#define buttons_interrupt_Pin GPIO_PIN_0
+#define buttons_interrupt_GPIO_Port GPIOB
+#define buttons_interrupt_EXTI_IRQn EXTI0_IRQn
+#define buttons_col_2_Pin GPIO_PIN_8
+#define buttons_col_2_GPIO_Port GPIOD
+#define buttons_row_0_Pin GPIO_PIN_11
+#define buttons_row_0_GPIO_Port GPIOD
 #define LED_groen_Pin GPIO_PIN_12
 #define LED_groen_GPIO_Port GPIOD
 #define LED_oranje_Pin GPIO_PIN_13
 #define LED_oranje_GPIO_Port GPIOD
 #define LED_rood_Pin GPIO_PIN_14
 #define LED_rood_GPIO_Port GPIOD
+#define buttons_row_1_Pin GPIO_PIN_1
+#define buttons_row_1_GPIO_Port GPIOD
+#define buttons_col_0_Pin GPIO_PIN_6
+#define buttons_col_0_GPIO_Port GPIOD
+#define buttons_col_1_Pin GPIO_PIN_7
+#define buttons_col_1_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
+#define OUTPUT_FPGA
+//#define OUTPUT_DFT_DEBUG
+
 enum gamestates {
 	GAME_RESET,					// Wordt gebruikt als het spel naar zijn origiele staat moet worden gereset.
 	GAME_STARTING,				// Wordt automatisch na GAME_RESET getriggert, hierin wordt gewacht totdat alle UART Commando's uitgestuurd zijn.
@@ -209,11 +221,6 @@ void sprite_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* 
 int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_struct* bullets, uint8_t bulletIndex);				//BB 0 voor omhoog, 1 voor omlaag
 
 //----- Einde Fabian Meijneken -----//
-
-
-//----- Bram Laurens -----//
-void run_dft();
-//----- Einde Bram Laurens -----//
 
 
 /* USER CODE END Private defines */

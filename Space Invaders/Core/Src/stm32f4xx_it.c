@@ -22,6 +22,8 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
+#include "dft.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,7 +45,7 @@
 /* USER CODE BEGIN PV */
 
 extern volatile bool update_tick_20hz;
-
+extern volatile bool button_command_override;
 
 /* USER CODE END PV */
 
@@ -205,6 +207,28 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32f4xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles EXTI line0 interrupt.
+  */
+void EXTI0_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI0_IRQn 0 */
+  get_button_command();
+
+  if (HAL_GPIO_ReadPin(buttons_interrupt_GPIO_Port, buttons_interrupt_Pin))
+	  button_command_override = true;
+  else
+	  button_command_override = false;
+
+
+
+  /* USER CODE END EXTI0_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(buttons_interrupt_Pin);
+  /* USER CODE BEGIN EXTI0_IRQn 1 */
+
+  /* USER CODE END EXTI0_IRQn 1 */
+}
 
 /**
   * @brief This function handles DMA1 stream6 global interrupt.

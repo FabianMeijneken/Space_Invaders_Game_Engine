@@ -30,7 +30,12 @@ void init_LUTs();
 float lut_lookup(float *lut, float index);
 float DFT_compute_LUT(float DFT_frequency);
 float DFT_range_peak(float freq_min, float freq_max);
+void run_dft();
+
 void command_handler(uint8_t command, player_struct* player, bullet_struct* bullets, sprite_struct* sprite);
+void get_button_command();
+void init_buttons();
+
 
 typedef struct {
     uint8_t command_id;
