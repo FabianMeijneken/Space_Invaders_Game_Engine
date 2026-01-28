@@ -1116,6 +1116,9 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 			&& (bullets + bulletIndex)->Y_pos + BULLET_LENGTE <= player->Y_pos + SPELER_LENGTE		// Check of de kogel y binnen de speler y valt
 		   )
 		{
+			// Verwijder betreffende bullet
+			BulletBeheer(bullets, 2, bulletIndex, true, player, sprites, 0);		// In deze call maken alleen de argumenten "bullets", "actie" (2) en "bulletIndex", uit. player en sprites worden bij actie=2 genegeerd.
+
 			if (--(player->lives) == 0)
 				game_status = GAME_OVER;
 
@@ -1141,9 +1144,9 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 						return 1;
 					}
 
-					// Er is een collision, maak de sprite dood en verwijder de kogel
-					(sprites + i)->alive = 0;
 
+					// Er is een collision, maak de sprite dood.
+					(sprites + i)->alive = 0;
 
 					// Update score
 					player->score += SCORE_PER_ENEMIE;
