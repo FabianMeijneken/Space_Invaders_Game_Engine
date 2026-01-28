@@ -361,7 +361,7 @@ int main(void)
 
 					// Laat een random enemy een bullet schieten
 					if ((rand() % BULLET_FREQUENCY) == 1)
-						enemy_shoot(&player,
+						sprite_shoow(&player,
 									bullets,
 									sprites,
 									(rand() % ((AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ) - 1))
@@ -1020,7 +1020,7 @@ void player_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* 
  *
  * @return void
  */
-void enemy_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite, int sprite_num)
+void sprite_shoow(player_struct* player, bullet_struct* bullets, sprite_struct* sprite, int sprite_num)
 {
     // shot by user is hier false. Er zal vanaf sprite x (sprite_num) een bullet worden geschoten.
 	BulletBeheer(bullets, 1, 1, false, player, sprite, sprite_num);

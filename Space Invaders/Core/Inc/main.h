@@ -205,7 +205,7 @@ void collision_check_all_bullets(sprite_struct* sprites, player_struct* player, 
 //----- Fabian Meijneken -----//
 void player_move(player_struct* player, char move_left);
 void player_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite);
-void enemy_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite, int sprite_num);
+void sprite_shoow(player_struct* player, bullet_struct* bullets, sprite_struct* sprite, int sprite_num);
 int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_struct* bullets, uint8_t bulletIndex);				//BB 0 voor omhoog, 1 voor omlaag
 
 //----- Einde Fabian Meijneken -----//
