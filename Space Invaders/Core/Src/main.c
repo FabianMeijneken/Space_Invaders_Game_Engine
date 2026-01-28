@@ -1084,7 +1084,7 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 				   )
 				{
 					// Controleer of alle sprites dood zijn
-					if (aantal_sprites_dood++ == (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES))
+					if (++aantal_sprites_dood == (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES))
 					{
 						game_status = GAME_WON;
 						return 1;
