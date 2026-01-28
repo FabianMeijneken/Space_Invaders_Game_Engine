@@ -18,7 +18,6 @@
   */
 
 // TODO At collision, send command for only that row. This saves uart size, maby that removes the stutter on colision?
-// TODO fix sprites moving too far to the left
 // TODO low prio, UART can lose position when STM32 resets during UART command.
 
 
