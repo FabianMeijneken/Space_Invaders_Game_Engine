@@ -465,7 +465,33 @@ int main(void)
 				break;
 
 			case GAME_PAUSED :
-				// TODO: GAME_PAUSED actie maken
+				if (update_tick_20hz)
+				{
+					if (game_done_clock_counter++ >= 10)
+					{
+						game_done_clock_counter = 1;
+						game_done_clock = true;
+					}
+
+					update_tick_20hz = false;
+				}
+				if (game_done_clock)
+				{
+					// Flicker de game_over bit (render bit 0b10)
+					if (game_done_flicker_count++ % 2)
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b1);
+					else
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b0);
+
+					if (game_done_flicker_count >= game_over_flicker_duration)
+					{
+						game_done_flicker_count = 0;
+						game_status = GAME_RESET;
+					}
+
+					game_done_clock = false;
+				}
+
 				break;
 
 		}

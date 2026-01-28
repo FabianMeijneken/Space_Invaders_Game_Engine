@@ -183,23 +183,28 @@ void command_handler(uint8_t command, player_struct* player, bullet_struct* bull
 				game_status = GAME_PAUSED;
 			if (game_status == GAME_PAUSED)
 				game_status = GAME_RUNNING;
-      break;
+			break;
+
 
 		// Beweeg naar links
 		case 1:
-			player_move(player, 1);
-      break;
+			if(game_status != GAME_PAUSED)
+				player_move(player, 1);
+			break;
+
 
 		// Beweeg naar rechts
 		case 2:
-			player_move(player, 0);
-      break;
+			if(game_status != GAME_PAUSED)
+				player_move(player, 0);
+			break;
+
 
 		// Schiet
 		case 3:
-			player_shoot(player, bullets, sprite);
-      break;
-
+			if(game_status != GAME_PAUSED)
+				player_shoot(player, bullets, sprite);
+			break;
 	}
 }
 
