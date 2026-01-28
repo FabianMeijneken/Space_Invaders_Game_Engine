@@ -17,15 +17,12 @@
   ******************************************************************************
   */
 
-
-
 // TODO At collision, send command for only that row. This saves uart size, maby that removes the stutter on colision?
-// TODO Dode sprites schieten bullets
 // TODO fix sprites moving too far to the left
 // TODO fix player being able to go offscreen on the right.
-// TODO buttons as overwrite of DFT
-// TODO score doesn't reset at first run
 // TODO health takes 2 per hit.
+
+// TODO low prio, UART can lose position when STM32 resets during UART command.
 
 
 /* USER CODE END Header */
@@ -370,14 +367,16 @@ int main(void)
 					{
 						
 						// Maak een array met alle levende sprites daarin.
-						int alive_sprites[AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ];
+						int alive_sprites[aantal_levende_sprites];
+						uint8_t count = 0;
 
 						for (int i = 0; i < (AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ); i++)
 						{
-							alive_sprites[i] = sprites[i].alive;
+							if (sprites[i].alive)
+								alive_sprites[count++] = sprites[i].id;
 						}
 
-						int random_sprite = alive_sprites[(rand() % (aantal_levende_sprites - 1))];
+						int random_sprite = alive_sprites[(rand() % aantal_levende_sprites)];
 
 						// Schiet een bullet vanaf een random levende sprite.
 						sprite_shoot(&player,
