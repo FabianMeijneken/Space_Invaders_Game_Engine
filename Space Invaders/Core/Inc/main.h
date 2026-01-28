@@ -124,7 +124,7 @@ enum gamestates {
 #define PLAYER_X_START 			320
 #define PLAYER_Y_START 			440
 #define PLAYER_MOVE_SPEED 		8
-#define MAX_PLAYER_BULLET_COUNT 1
+#define MAX_PLAYER_BULLET_COUNT 2
 
 
 #define SCORE_PER_ENEMIE		40		// 10 punten per enemie die je doodschiet.

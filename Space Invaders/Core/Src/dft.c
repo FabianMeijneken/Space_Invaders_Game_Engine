@@ -19,7 +19,7 @@ const commanddft_struct command_dft_list[CMD_amount] = {
   {0, 4009,4500, 0.5},    // Command 0: pauze
   {1, 1100, 1500, 0.5},   // Command 1: beweeg links
   {2, 1500, 2000, 0.3},  // Command 2: beweeg rechts
-  {3, 600, 1100, 0.2}   // Command 3: schiet
+  {3, 600, 1100, 0.5}   // Command 3: schiet
 };
 
 
