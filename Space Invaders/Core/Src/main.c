@@ -20,8 +20,7 @@
 
 
 // TODO At collision, send command for only that row. This saves uart size, maby that removes the stutter on colision?
-// TODO Check voor game ending.
-// TODO Score reset niet als je het spel hard reset (door knopje op STM)
+// TODO Lage prio - Score reset niet als je het spel hard reset (door knopje op STM)
 // TODO dode sprites schieten bullets
 
 
@@ -1087,7 +1086,7 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 					// Controleer of alle sprites dood zijn
 					if (aantal_sprites_dood++ == (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES))
 					{
-						game_state = GAME_WON;
+						game_status = GAME_WON;
 						return 1;
 					}
 
