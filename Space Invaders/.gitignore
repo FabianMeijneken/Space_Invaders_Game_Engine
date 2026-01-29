@@ -1,1 +1,5 @@
 /Debug/
+
+# Ignore vscode settings
+./.vscode/
+/.vscode

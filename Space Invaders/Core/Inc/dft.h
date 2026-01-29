@@ -8,18 +8,47 @@
   ******************************************************************************
   */
 
+#ifndef DFT_H
+#define DFT_H
+
 #include "main.h"
 
 
 // External variables
 extern int ADC_buffer[ADC_BUFFER_SIZE];
+extern volatile enum gamestates game_status;
+extern volatile bool button_command_override;
+
 
 // Defines
 #define Fs 10000.0f		 			// Sampling frequency
 #define Nf (float)ADC_BUFFER_SIZE;
 #define scale 3.0f / 4095.0f; 		// Scale factor to convert ADC value to absolut volts
+#define CMD_amount 4
 
 // Functie prototypes
 void init_LUTs();
 float lut_lookup(float *lut, float index);
 float DFT_compute_LUT(float DFT_frequency);
+float DFT_range_peak(float freq_min, float freq_max);
+void run_dft();
+
+void command_handler(uint8_t command, player_struct* player, bullet_struct* bullets, sprite_struct* sprite);
+void get_button_command();
+void init_buttons();
+
+
+typedef struct {
+    uint8_t command_id;
+    uint16_t frequency_min;
+    uint16_t frequency_max;
+    float threshold;
+} commanddft_struct, *commandsdft_ptr;
+
+extern const commanddft_struct command_dft_list[CMD_amount];
+
+#endif /* DFT_H */
+
+
+
+

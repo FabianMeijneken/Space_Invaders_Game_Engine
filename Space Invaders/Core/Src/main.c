@@ -13,9 +13,11 @@
   * in the root directory of this software component.
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
-  * @author 		: Finn van Zijverden, Kim Lobstein, Fabian Meijneken
+  * @author 		: Finn van Zijverden, Kim Lobstein, Fabian Meijneken, Bram Laurens
   ******************************************************************************
   */
+
+
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -54,33 +56,43 @@ DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
 // Game variables
-bool update_tick_20hz = false;				// Globaal gedefinieerd omdat deze ook in de it.c wordt gebruikt.
-enum gamestates game_status = GAME_STARTING;
+volatile bool update_tick_20hz = false;				// Globaal gedefinieerd omdat deze ook in de it.c wordt gebruikt.
+volatile enum gamestates game_status = GAME_RESET;
+
 const bullet_struct bullet_empty = {
-	.X_pos = 0,
-	.Y_pos = 0,
+	.X_pos = 10,
+	.Y_pos = 10,
 	.actief = 0,
-	.object_ID = 0,
+	.object_ID = 14,						// Dit moet een ongebruikt object_ID zijn, anders zal tijdens het renderen dit object ID steeds gaan "flikkeren"
 	.richting = 0
 };
 
-// Sprite move variables
-uint8_t links_rechts = 1; 					// Deze variabelle geeft aan of de sprites naar links of rechts bewegen. (0 voor links, 1 voor rechts)
+uint8_t game_done_flicker_count = 0;
+volatile bool button_command_override = false;
+
+
+// Sprite variables
+uint8_t links_rechts; 													// Deze variable geeft aan of de sprites naar links of rechts bewegen. (0 voor links, 1 voor rechts)
+int SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;								// Deze deelt een 20 Hz klok. met een waar van 10 bewegen de sprites op 2 Hz.
+int aantal_levende_sprites = SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES;		// Deze variable houdt de hoeveelheid levende sprites bij.
+int active_sprite_bullet_count = 0;
 
 // UART variables
 uint32_t tx_buffer[UART2_TX_BUFFER_SIZE];
 uint8_t uart2_DMA_index, uart2_upload_index = 0;
 bool UART2_busy;
+uint8_t uart2_DMA_tx_bytes[4] = {0};
 
 
 // DFT variables
-uint32_t current_ADC_value;
-int ADC_buffer[ADC_BUFFER_SIZE];
-bool buffer_full = false;
-bool new_ADC_value_recieved = false;
-int ADC_index = 0;
+// ADC DMA will continuously fill this block buffer; we copy into ADC_buffer in the DMA callbacks.
+#define ADC_DMA_BLOCK_SAMPLES 64
+static uint16_t adc_dma_block[ADC_DMA_BLOCK_SAMPLES];
+static volatile bool adc_dma_block_ready = false; // Set true when a full 64-sample block has been captured.
 
-int command_freqs[] = {500, 1000, 1500, 2000}; 	// TODO: Deze frequenties aanpassen.
+int ADC_buffer[ADC_BUFFER_SIZE];
+volatile bool buffer_full = false;
+volatile uint32_t ADC_index = 0;
 
 
 
@@ -96,30 +108,6 @@ static void MX_ADC1_Init(void);
 static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
-//----- Finn van Zijverden -----//
-void BulletBeheer(bullet_struct* bullets, char actie, int bulletID, bool shot_by_user, player_struct* player, sprite_struct* sprite);
-uint8_t ID_checker(bullet_struct* bullets);
-void bulletUpdater(bullet_struct* bullets);
-//----- Einde Finn van Zijverden -----//
-
-
-//----- Kim Lobstein -----//
-void move_sprites(sprite_struct* sprites);
-void collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_struct* bullets, uint8_t bulletIndex, uint8_t BB);
-void collision_check_all_bullets(sprite_struct* sprites, player_struct* player, bullet_struct* bullets);
-//----- Einde Kim Lobstein -----//
-
-
-//----- Fabian Meijneken -----//
-void player_move(player_struct* player, char move_left);
-void player_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite);
-void command_handler(uint8_t command, player_struct* player, bullet_struct* bullets, sprite_struct* sprite);
-//----- Einde Fabian Meijneken -----//
-
-
-//----- Bram Laurens -----//
-void run_dft();
-//----- Einde Bram Laurens -----//
 
 /* USER CODE END PFP */
 
@@ -138,11 +126,15 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
 	// Klokdeler init:
-	char klok_10_hz_counter = 1;
-	bool klok_10_hz = false;
+	char sprite_move_clock_counter = 1;
+	bool sprite_move_clock = false;
+
+	char game_done_clock_counter = 1;
+	bool game_done_clock = false;
 
 	// Player init:
 	player_struct player;
+	player.score = 0;
 
 	// Sprite init:
 	sprite_struct sprites[SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES];
@@ -179,9 +171,13 @@ int main(void)
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_TIM_Base_Start_IT(&htim3);		// Gebruikt voor DFT.
-  HAL_TIM_Base_Start_IT(&htim4);		// Gebruikt voor game updates.
-  HAL_ADC_Start_DMA(&hadc1, &current_ADC_value, 1); // Link the ADC DMA to current_ADC_value.
+	HAL_TIM_Base_Start_IT(&htim3);		// Gebruikt voor DFT.
+	HAL_TIM_Base_Start_IT(&htim4);		// Gebruikt voor game updates.
+	// Capture ADC samples in blocks of 64; HAL will call Conv(Half)Cplt callbacks via DMA.
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_block, ADC_DMA_BLOCK_SAMPLES);
+
+	init_LUTs();						// Initialiseer de LUTs voor de DFT.
+	init_buttons();						// initialize the buttons for command override.
 
   /* USER CODE END 2 */
 
@@ -189,16 +185,48 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 	while (1)
 	{
+		// Debug: only run/print when we have a full ADC buffer and UART2 is idle.
+		// NOTE: USART2 is also used for DMA TX to the FPGA; mixing DMA + blocking TX can result in HAL_BUSY.
+		
+
+		#ifdef OUTPUT_DFT_DEBUG
+		int msg_length;
+		char msg[64];
+		float peak;
+		
+		peak = DFT_range_peak(600.0f, 1100.0f);
+		msg_length = snprintf(msg, sizeof(msg), "DFT Peak 600Hz-1.1kHz: %.2f	", peak);
+		(void)HAL_UART_Transmit(&huart2, (uint8_t*)msg, (uint16_t)msg_length, 100);
+
+		peak = DFT_range_peak(1100.0f, 1500.0f);
+		msg_length = snprintf(msg, sizeof(msg), "DFT Peak 1.1kHz-1.5kHz: %.2f	", peak);
+		(void)HAL_UART_Transmit(&huart2, (uint8_t*)msg, (uint16_t)msg_length, 100);
+
+		peak = DFT_range_peak(1500.0f, 2000.0f);
+		msg_length = snprintf(msg, sizeof(msg), "DFT Peak 1.5kHz-2kHz: %.2f		", peak);
+		(void)HAL_UART_Transmit(&huart2, (uint8_t*)msg, (uint16_t)msg_length, 100);
+
+		peak = DFT_range_peak(4000.0f, 4500.0f);
+		msg_length = snprintf(msg, sizeof(msg), "DFT Peak 4kHz-4.5kHz: %.2f	\r\n", peak);
+		(void)HAL_UART_Transmit(&huart2, (uint8_t*)msg, (uint16_t)msg_length, 100);
+		#endif
+
 		// Update het spel alleen als de game loopt.
 		switch (game_status)
 		{
 			// Wordt gebruikt aan het begin van het spel, reset alle posities en waardes.
-			case GAME_STARTING:
-				// Reset clock
-				klok_10_hz_counter = 1;
-				klok_10_hz = false;
+			case GAME_RESET:
+				//----- Reset clock -----//
+				sprite_move_clock_counter = 1;
+				sprite_move_clock = false;
 
-				// Reset player
+				//----- Reset sprite  variables -----//
+				SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;
+				aantal_levende_sprites = SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES;
+				links_rechts = 1;
+
+
+				//----- Reset player -----//
 				player.obj_ID =					0;
 				player.X_pos = 					PLAYER_X_START;
 				player.Y_pos = 					PLAYER_Y_START;
@@ -207,7 +235,7 @@ int main(void)
 				player.lives = 					3;
 				player.score = 					0;
 
-				// Reset Sprites
+				//----- Reset Sprites -----//
 				for (uint8_t rij = 0; rij < (AANTAL_RIJEN_SPRITES); rij++)
 				{
 					for (uint8_t kolom = 0; kolom < (SPRITES_PER_RIJ); kolom ++)
@@ -220,62 +248,248 @@ int main(void)
 
 				}
 
-				// Reset Bullets
-				for (int i = 0; i < MAX_BULLET_AMOUNT - 1; i++)
+				//----- Reset Bullets -----//
+				for (int i = 0; i < MAX_BULLET_AMOUNT; i++)
 				{
 					bullets[i] = bullet_empty;
 				}
 
 
-				game_status = GAME_RUNNING;
+				//----- Verstuur kogel locaties -----//
+				for (int i = 0; i < MAX_BULLET_AMOUNT; i++)
+				{
+					update_FPGA((6 + i),
+								(bullets + i)->X_pos,
+								(bullets + i)->Y_pos,
+								((bullets + i)->richting << 1) | (bullets + i)->actief		// LSB is nu "richting", bitje links daarvan is "actief"
+								);
+				}
+
+				//----- Verstuur sprite locaties -----//
+				// Dit loopt vanaf 1 aangezien de player ID 1 heeft.
+				for (int rij = 1; rij <= AANTAL_RIJEN_SPRITES; rij++)
+				{
+					uint8_t render_bits = 0b0;
+					for (int i = 0; i < SPRITES_PER_RIJ; i++)
+						render_bits |= ((sprites + ((rij-1) * 6) + i) -> alive) << (SPRITES_PER_RIJ - 1 - i);
+
+					update_FPGA(rij, (sprites + ((rij-1) * 6))->X_pos, (sprites + ((rij-1) * 6))->Y_pos, render_bits);
+				}
 
 
+				game_status = GAME_STARTING;
+				break;
+
+
+			// Wordt gebruikt om na de GAME_RESET alle UART commando's weg te werken. Pas als alles is verstuurd gaan we door.
+			case GAME_STARTING :
+				if (uart2_DMA_index == uart2_upload_index)
+					game_status = GAME_RUNNING;
+
+				break;
+
+
+			// Loopt tijdens het spel
 			case GAME_RUNNING :
 				// DFT, bullet en player update.
 				if (update_tick_20hz)
 				{
 					HAL_GPIO_TogglePin(LED_oranje_GPIO_Port, LED_oranje_Pin);
+					game_done_flicker_count = 0;			// This is needed to reset the flicker count when coming out of the pauze state.
 
 					//----- DFT update -----//
-					run_dft();
+					run_dft(&player, &bullets, &sprites);
 
-					//----- Bullet locatie updaten -----//
-
-					// Update locatie
-					bulletUpdater(bullets);
 					// Check voor collision
 					collision_check_all_bullets(sprites, &player, bullets);
 
+					// Update bullet locatie
+					bulletUpdater(bullets, &player);
 
 
-					update_tick_20hz = false;
-
-					if (klok_10_hz_counter++ == KLOKDELER_SPRITE_UPDATE)
+					// Verstuur kogel locaties
+					for (int i = 0; i < MAX_BULLET_AMOUNT; i++)
 					{
-					  klok_10_hz_counter = 1;
-					  klok_10_hz = true;
+						update_FPGA((bullets + i)->object_ID,
+									(bullets + i)->X_pos,
+									(bullets + i)->Y_pos,
+									((bullets + i)->richting << 1) | (bullets + i)->actief		// LSB is nu "richting", bitje links daarvan is "actief"
+									);	
 					}
 
+					// Verstuur speler locatie
+					update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, (((player.lives & 0b11) << 1) | 0b1));
+
+					// Verstuur de score
+					// In de FPGA worden de bitjes van Y achter de bitjes van X geplakt om zo een 19 bits getal te genereren.
+					// player.score is een uint16_t
+					update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b0);
+
+
+					// Genereer de sprite_move klok. Dit wordt gedaan met een instelbare frequentie.
+					if (sprite_move_clock_counter++ >= (SPRITES_MOVE_FREQ / 3))
+					{
+					  sprite_move_clock_counter = 1;
+					  sprite_move_clock = true;
+					}
+
+					update_tick_20hz = false;
 				}
 
 				// Sprite update
-				if (klok_10_hz)
+				if (sprite_move_clock)
 				{
 					HAL_GPIO_TogglePin(LED_groen_GPIO_Port, LED_groen_Pin);
 
-					//----- Enemy locatie updaten -----//
+					// Update sprite locatie
 					move_sprites(sprites);
-					// TODO: send UART message to move sprites.
+
+					// Verstuur sprite locaties
+					// Dit loopt vanaf 1 aangezien de player ID 1 heeft.
+					for (int rij = 1; rij <= AANTAL_RIJEN_SPRITES; rij++)
+					{
+						uint8_t render_bits = 0b0;
+						for (int i = 0; i < SPRITES_PER_RIJ; i++)
+							render_bits |= ((sprites + ((rij-1) * 6) + i) -> alive) << (SPRITES_PER_RIJ - 1 - i);
+
+						update_FPGA(rij, (sprites + ((rij-1) * 6))->X_pos, (sprites + ((rij-1) * 6))->Y_pos, render_bits);
+					}
+
+					// Zet de "random seed" naar de runtime in miliseconds, deze is max 32 bits.
+					// Dit geeft een meer random waarde.
+					srand(HAL_GetTick());
+
+					// Laat een random enemy een bullet schieten
+					if ((rand() % BULLET_FREQUENCY) == 1)
+					{
+						
+						// Maak een array met alle levende sprites daarin.
+						int alive_sprites[aantal_levende_sprites];
+						uint8_t count = 0;
+
+						for (int i = 0; i < (AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ); i++)
+						{
+							if (sprites[i].alive)
+								alive_sprites[count++] = sprites[i].id;
+						}
+
+						int random_sprite = alive_sprites[(rand() % aantal_levende_sprites)];
+
+						// Schiet een bullet vanaf een random levende sprite.
+						sprite_shoot(&player,
+									bullets,
+									sprites,
+									random_sprite
+									);
+					}
 
 
-					klok_10_hz = false;
+
+					sprite_move_clock = false;
 				}
+
+				break;
+
+
+			// Wordt gebruikt als de speler heeft gewonnen.
 			case GAME_WON :
-				// TODO: GAME_WON actie maken
+				if (update_tick_20hz)
+				{
+					if (game_done_clock_counter++ >= 10)
+					{
+						game_done_clock_counter = 1;
+						game_done_clock = true;
+					}
+
+					update_tick_20hz = false;
+				}
+
+				if (game_done_clock)
+				{
+					// Verstuur speler locatie (voor een update van de health)
+					update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, (((player.lives & 0b11) << 1) | 0b1));
+
+
+					// Flicker de game_won bit (render bit 0b100)
+					if (game_done_flicker_count++ % 2)
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b100);
+					else
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b0);
+
+					if (game_done_flicker_count >= game_won_flicker_duration)
+					{
+						HAL_Delay(1000);
+						game_done_flicker_count = 0;
+						game_status = GAME_RESET;
+					}
+
+					game_done_clock = false;
+				}
+				break;
+
 			case GAME_OVER :
-				// TODO: GAME_OVER actie maken
+				if (update_tick_20hz)
+				{
+					if (game_done_clock_counter++ >= 10)
+					{
+						game_done_clock_counter = 1;
+						game_done_clock = true;
+					}
+
+					update_tick_20hz = false;
+				}
+
+				if (game_done_clock)
+				{
+					player.score = 0;
+					player.lives = 3;
+
+					// Verstuur speler locatie (voor een update van de health)
+					update_FPGA(player.obj_ID, player.X_pos, player.Y_pos, (((player.lives & 0b11) << 1) | 0b1));
+
+					// Flicker de game_over bit (render bit 0b10)
+					if (game_done_flicker_count++ % 2)
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b10);
+					else
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b0);
+
+					if (game_done_flicker_count >= game_over_flicker_duration)
+					{
+						HAL_Delay(1000);
+						game_done_flicker_count = 0;
+						game_status = GAME_RESET;
+					}
+
+					game_done_clock = false;
+				}
+				break;
+
 			case GAME_PAUSED :
-				// TODO: GAME_PAUSED actie maken
+				if (update_tick_20hz)
+				{
+
+					//----- DFT update -----//
+					run_dft(&player, &bullets, &sprites);
+
+					if (game_done_clock_counter++ >= 10)
+					{
+						game_done_clock_counter = 1;
+						game_done_clock = true;
+					}
+
+					update_tick_20hz = false;
+				}
+				if (game_done_clock)
+				{
+					// Flicker de game_over bit (render bit 0b10)
+					if (game_done_flicker_count++ % 2)
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b1);
+					else
+						update_FPGA(SYSTEM_OBJ_ID, (player.score >> 9), (player.score), 0b0);
+
+					game_done_clock = false;
+				}
+				break;
 
 		}
 
@@ -290,45 +504,16 @@ int main(void)
 			uint32_t current_command = tx_buffer[uart2_DMA_index];
 
 			// Splits het commando (uint32_t) op in 4 uint8_t delen. Dit is nodig voor de UART transmision.
-			uint8_t uart_message[4] = {0};
 
-			uart_message[0] = (uint8_t) current_command;
-			uart_message[1] = (uint8_t) (current_command >> 8);
-			uart_message[2] = (uint8_t) (current_command >> 16);
-			uart_message[3] = (uint8_t) (current_command >> 24);
+			uart2_DMA_tx_bytes[0] = (uint8_t) current_command;
+			uart2_DMA_tx_bytes[1] = (uint8_t) (current_command >> 8);
+			uart2_DMA_tx_bytes[2] = (uint8_t) (current_command >> 16);
+			uart2_DMA_tx_bytes[3] = (uint8_t) (current_command >> 24);
 
-			HAL_UART_Transmit_DMA(&huart2, uart_message, 4);
+			HAL_UART_Transmit_DMA(&huart2, uart2_DMA_tx_bytes, 4);
 		}
 
 
-		// Add new ADC value to the circular ADC buffer
-		if (new_ADC_value_recieved)
-		{
-			if(ADC_index < ADC_BUFFER_SIZE)
-			  {
-			      ADC_buffer[ADC_index] = current_ADC_value;
-			      ADC_index++;
-
-			      if(ADC_index >= ADC_BUFFER_SIZE)
-			      {
-			          buffer_full = true;
-			          ADC_index = 0;
-			      }
-			  }
-			  else
-			  {
-			    // Fallback
-				  ADC_index = 0;
-			  }
-
-			new_ADC_value_recieved = false;
-		}
-
-
-		if (uart2_upload_index == uart2_DMA_index - 1)
-		{
-			game_status = GAME_OVER;
-		}
 
     /* USER CODE END WHILE */
 
@@ -597,17 +782,37 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, LED_groen_Pin|LED_oranje_Pin|LED_rood_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, buttons_row_0_Pin|LED_groen_Pin|LED_oranje_Pin|LED_rood_Pin
+                          |buttons_row_1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : LED_groen_Pin LED_oranje_Pin LED_rood_Pin */
-  GPIO_InitStruct.Pin = LED_groen_Pin|LED_oranje_Pin|LED_rood_Pin;
+  /*Configure GPIO pin : buttons_interrupt_Pin */
+  GPIO_InitStruct.Pin = buttons_interrupt_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(buttons_interrupt_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : buttons_col_2_Pin buttons_col_0_Pin buttons_col_1_Pin */
+  GPIO_InitStruct.Pin = buttons_col_2_Pin|buttons_col_0_Pin|buttons_col_1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : buttons_row_0_Pin LED_groen_Pin LED_oranje_Pin LED_rood_Pin
+                           buttons_row_1_Pin */
+  GPIO_InitStruct.Pin = buttons_row_0_Pin|LED_groen_Pin|LED_oranje_Pin|LED_rood_Pin
+                          |buttons_row_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -632,11 +837,11 @@ static void MX_GPIO_Init(void)
 
 // Als actie 2 is, bepaald bulletID welke bullet [0 ... MAX_BULLETS-1] wordt verwijderd. Als de actie 1 is, wordt deze variabel niet gebruikt.
 // Als actie 2 wordt spriteID niet gebruikt
-// Als actie 1 is, en shot_by_user is 1. Dan schiet de speler 1 bullet, en wordt spriteID niet gebruikt. Als shot_by_user 0 is, dan wordt de bullet vanaf sprite[spriteID] geschoten.
+// Als actie 1 is, en shot_by_user is 1. Dan schiet de speler 1 bullet, en wordt sprite_num niet gebruikt. Als shot_by_user 0 is, dan wordt de bullet vanaf sprite[sprite_num] geschoten.
 
 
 // de pointer naar de sprite point naar de sprite die schiet, dus NIET altijd naar de eerste waarde van de array.
-void BulletBeheer(bullet_struct* bullets, char actie, int bulletIndex, bool shot_by_user, player_struct* player, sprite_struct* sprite)
+void BulletBeheer(bullet_struct* bullets, char actie, int bulletIndex, bool shot_by_user, player_struct* player, sprite_struct* sprite, int sprite_num)
 {
 	uint8_t currentBullet = 0;
 
@@ -656,6 +861,7 @@ void BulletBeheer(bullet_struct* bullets, char actie, int bulletIndex, bool shot
 			(bullets + currentBullet) -> richting = 0;
 			(bullets + currentBullet) -> X_pos = player->X_pos;
 			(bullets + currentBullet) -> Y_pos = player->Y_pos;
+			(bullets + currentBullet) -> object_ID = 6 + currentBullet;
 
 			// Aangeven dat de bullet in gebruik is
 			(bullets + currentBullet) -> actief = 1;
@@ -671,13 +877,19 @@ void BulletBeheer(bullet_struct* bullets, char actie, int bulletIndex, bool shot
 			if (currentBullet == 0xFF)
 				return;
 
+			// Variabelen schrijven naar de vrije bullet index
 			(bullets + currentBullet) -> richting = 1;
-			(bullets + currentBullet) -> X_pos = sprite -> X_pos;
-			(bullets + currentBullet) -> Y_pos = sprite -> Y_pos;
+			(bullets + currentBullet) -> X_pos = (sprite + sprite_num) -> X_pos;
+			(bullets + currentBullet) -> Y_pos = (sprite + sprite_num) -> Y_pos;
+			(bullets + currentBullet) -> object_ID = 6 + currentBullet;
+
+			// Aangeven dat de bullet in gebruik is
 			(bullets + currentBullet) -> actief = 1;
 
 			// Er wordt hier geen update naar de FPGA gestuurd, omdat dat door de bulletUpdater wordt gedaan.
 		}
+
+		break;
 
 	case 2:
 
@@ -714,19 +926,32 @@ uint8_t ID_checker(bullet_struct* bullets)
 
 // Functie voor het updaten van de locaties van de bullets
 // Deze update de locatie op basis van de richting van de kogel
-void bulletUpdater(bullet_struct* bullets)
+void bulletUpdater(bullet_struct* bullets, player_struct* player)
 {
 	for (uint8_t i = 0; i < MAX_BULLET_AMOUNT; i++)
 	{
 		if ((bullets + i)->actief)
 		{
-			if ((bullets + i)->richting)
-				(bullets + i)->X_pos += BULLET_MOVE_SPEED;
-			else
-				(bullets + i)->X_pos -= BULLET_MOVE_SPEED;
-		}
 
-		update_FPGA((bullets + i)->object_ID, (bullets + i)->X_pos, (bullets + i)->Y_pos, 0b1);
+			// Check of de bullet moet worden verwijderd
+			if (((bullets + i)->Y_pos <= BULLET_Y_MIN)
+					| ((bullets + i)->Y_pos >= BULLET_Y_MAX))
+			{
+				// Als de bullet is geschoten door de speler, verlaag de
+				if ((bullets + i)->richting == 0)
+					player->active_bullet_count--;
+
+				(bullets + i)->actief = false;
+				continue;
+			}
+
+
+			// Beweeg de kogel in de juiste richting
+			if ((bullets + i)->richting)
+				(bullets + i)->Y_pos += BULLET_MOVE_SPEED;
+			else
+				(bullets + i)->Y_pos -= BULLET_MOVE_SPEED;
+		}
 	}
 }
 
@@ -739,109 +964,61 @@ void bulletUpdater(bullet_struct* bullets)
 //-------------------- Kim Lobstein --------------------//
 
 void move_sprites(sprite_struct* sprites){
-	// TODO: herschrijven zodat ook de bovenste enemies als eerste dood kunnen gaan.
-	// Alleen de bovenste rij wordt gechecked of ze aan de zijkant zijn.
+	bool sprite_raakt_rand = false;
 
-	// Nu is het zo dat de check of je de kant hebt geraakt wordt gedaan met ALLEEN de bovenste sprites.
-
-	// Check of je de kant al hebt geraakt.
-	for (uint8_t i = 0; i < SPRITES_PER_RIJ; i++){
-		if ((((sprites + i)->X_pos >= MAX_X_SPRITES)||((sprites + i)->X_pos <= MIN_X_SPRITES)) && ((sprites + i)->alive == 1))			//als een levende sprite de rechter rand raakt:
+	for (uint8_t i = 0; i < AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ; i++){
+		if (
+			(((sprites + i)->X_pos >= MAX_X_SPRITES)
+			|| (((sprites + i)->X_pos + SPRITE_BREEDTE) <= MIN_X_SPRITES))
+			&& ((sprites + i)->alive == 1)
+			)
 		{
-			links_rechts = !links_rechts;																								//draai dan de beweegrichting om
-
-			for (uint8_t k = 0; k < (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES); k++){														//en beweeg de sprites naar beneden
-				(sprites + k)->Y_pos = (sprites + k)->Y_pos + SPRITE_Y_MOVE_SPEED;														//sprites x pixels naar beneden
-
-				if ((sprites + k)->alive
-					&& (sprites + k)->Y_pos >= MAX_SPRITE_Y)
-				{
-					game_status = GAME_OVER;
-					return;
-					// Game over
-				}
-			}
+			sprite_raakt_rand = true;
+			break;
 		}
 	}
 
-	//beweeg vervolgens alle sprites in de ingestelde richting
-	for (uint8_t j = 0; j < (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES); j++){
-		(sprites + j)->X_pos += links_rechts ? SPRITE_X_MOVE_SPEED : -SPRITE_X_MOVE_SPEED;				// Ternary operator ;)
-	}
+	if (sprite_raakt_rand)
+	{
+		links_rechts = !links_rechts;
 
+		for (uint8_t k = 0; k <  AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ; k++)
+		{
+			if ((sprites + k)->alive
+				&& (sprites + k)->Y_pos + SPRITE_Y_MOVE_SPEED >= MAX_Y_SPRITES)
+			{
+				// Game over
+				game_status = GAME_OVER;
 
-//	if (links_rechts){
-//		for (uint8_t j = 0; j < (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES); j++){
-//			(sprites + j)->X_pos += SPRITE_MOVE_SPEED;											//sprites x pixels naar rechts
-//
-//			(sprites + j)->X_pos += links_rechts ? SPRITE_MOVE_SPEED : -SPRITE_MOVE_SPEED;
-//		}
-//	} else {
-//		for (uint8_t m = 0; m < (SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES); m++){
-//			(sprites + m)->X_pos -= SPRITE_MOVE_SPEED; 										//sprites x pixels naar links
-//		}
-//	}
-}
-
-
-void collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_struct* bullets, uint8_t bulletIndex, uint8_t BB)				//BB 0 voor omhoog, 1 voor omlaag
-{
-	//als de kogel omlaag beweegt:
-	if (BB) {
-		for (uint8_t i = 0; i < BULLET_BREEDTE; i++){ 		//kijk voor elke pixel in de breedte van de kogel of:
-			if ((bullets + bulletIndex)->X_pos + i >= player->X_pos && (bullets + bulletIndex)->X_pos + i <= player->X_pos + SPELER_BREEDTE){  		//of de x positie binnen de x positie van de speler valt.
-				if ((bullets + bulletIndex)->Y_pos + BULLET_LENGTE == player->Y_pos){												//en of de y positie vervolgens ook overeenkomt
-
-					//De speler verliest een leven
-					player->lives -= 1;
-
-					// Verwijder betreffende bullet
-					BulletBeheer(bullets, 2, bulletIndex, false, player, sprites);						// In deze call maken alleen de argumenten "bullets", "actie" (2) en "bulletIndex", uit. player en sprites worden bij actie=2 genegeerd.
-
-				}
-
+				return;
+			}
+			else
+			{
+				(sprites + k)->Y_pos = (sprites + k)->Y_pos + SPRITE_Y_MOVE_SPEED;
+				(sprites + k)->X_pos += links_rechts ? SPRITE_X_MOVE_SPEED : -SPRITE_X_MOVE_SPEED;				// Ternary operator ;)
 			}
 		}
 	}
-
-	//als de kogel omhoog beweegt:
 	else
 	{
-		for (uint8_t j = 0; j < BULLET_BREEDTE; j++)															// kijk voor elke pixel in de breedte van de kogel of:
+		for (uint8_t k = 0; k <  AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ; k++)
 		{
-			for (uint8_t k = 0; k < SPRITES_PER_RIJ; k++)														// kijk voor alle sprites in de bovenste rij of:
-			{
-				if ((bullets + bulletIndex)->X_pos + j >= (sprites + k)->X_pos													// of de x posities van de kogel overeenkomen met een die van een sprite
-					&& (bullets + bulletIndex)->X_pos + j <= (sprites + k)->X_pos + SPRITE_BREEDTE)
-				{
-					for (uint8_t m = 0; m < AANTAL_RIJEN_SPRITES; m++)											// kijk of voor 1 van de sprites in de kolom k:
-					{
-						if (((bullets + bulletIndex)->Y_pos == (sprites + (k + SPRITES_PER_RIJ * m))->Y_pos + SPRITE_LENGTE)		// of de sprite nog leeft en de y posities van de kogel en sprite overeenkomen
-							&& (sprites + (k + SPRITES_PER_RIJ * m))->alive == 1)
-						{
-							//als dat allemaal zo is; dan is er een collision met deze sprite. Deze gaat dan dood. daarna gaat de kogel ook dood
-							(sprites + (k + SPRITES_PER_RIJ * m))->alive = 0;
-
-							// Update score
-							player->score += SCORE_PER_ENEMIE;
-
-							// Verwijder betreffende bullet
-							BulletBeheer(bullets, 2, bulletIndex, true, player, sprites);		// In deze call maken alleen de argumenten "bullets", "actie" (2) en "bulletIndex", uit. player en sprites worden bij actie=2 genegeerd.
-						}
-					}
-				}
-			}
+				(sprites + k)->X_pos += links_rechts ? SPRITE_X_MOVE_SPEED : -SPRITE_X_MOVE_SPEED;				// Ternary operator ;)
 		}
 	}
 }
 
 
-// Functie die voor elke bullet een collision check uitvoert.
+
+// Functie die voor alle actieve bullets een collision check uitvoert.
+// Deze functie stopt as
 void collision_check_all_bullets(sprite_struct* sprites, player_struct* player, bullet_struct* bullets)
 {
-	for (int i = 0; i < (MAX_BULLET_AMOUNT - 1); i++)
+	for (int i = 0; i < MAX_BULLET_AMOUNT; i++)
 	{
-		collision_per_bullet(sprites, player, bullets, i, (bullets + i)->richting);
+		if ((bullets + i)->actief == 1)
+			if (collision_per_bullet(sprites, player, bullets, i))
+				continue;
 	}
 }
 
@@ -853,102 +1030,235 @@ void collision_check_all_bullets(sprite_struct* sprites, player_struct* player, 
 
 //-------------------- Fabian Meijneken --------------------//
 
-// Deze functie veranderd de speler x positie (opgeslagen in een struct).
-// Of de speler naar links of rechts beweegt, is aangegeven door move_left. Dit is in deze definitie constant gemaakt.
-// Deze functie returned een UART message in binair formaat.
-// Gemaakt door Fabian Meijneken - 09/01/2026
+
+/**
+ * @brief Deze functie veranderd de speler x positie (opgeslagen in een struct).
+ * 
+ * @author Fabian meijneken
+ * @date 09/01/2026
+ *
+ * @param player - pointer naar de player struct
+ * @param move_left - char die aangeeft of de speler naar links (1) of rechts (0) moet bewegen
+ * @return void
+ */
 void player_move(player_struct* player, char move_left)
 {
     // Controleer of we naar links of rechts moeten bewegen, en verander player.x hiernaar.
     if (move_left == 1)
     {
-        player->X_pos = (int16_t) (player->X_pos - player->speed);
-        // Ik gebruik hier een cast om warnings te voorkomen. Beide x en speed zijn van het type int16_t.
-        // Deze 16 bit integers worden voor de berekening beide omgezet naar een volledige integer (32 bit).
-        // Als de berekening klaar is en ze gaan terug naar en int16_t dan "kan" je data verliezen, ook al is dat niet zo.
-        // Om de compiler gerust te stellen gebruik ik dus een cast.
+    	if ((player->X_pos - player->speed) > PLAYER_X_MIN)
+            player->X_pos = (int16_t) (player->X_pos - player->speed);
+            // Ik gebruik hier een cast om warnings te voorkomen. Beide x en speed zijn van het type int16_t.
+			// Deze 16 bit integers worden voor de berekening beide omgezet naar een volledige integer (32 bit).
+			// Als de berekening klaar is en ze gaan terug naar en int16_t dan "kan" je data verliezen, ook al is dat niet zo.
+			// Om de compiler gerust te stellen gebruik ik dus een cast.
 
-        // Note: dit probleem had ook voorkomen kunnen worden door gewoon integers te gebruiken,
-        // maar ik zie dit als een mooie oefening tot het besparen van geheugen.
+			// Note: dit probleem had ook voorkomen kunnen worden door gewoon integers te gebruiken,
+			// maar ik zie dit als een mooie oefening tot het besparen van geheugen.
 
     } else
     {
-        player->X_pos = (int16_t) (player->X_pos + player->speed);
+    	if ((player->X_pos + player->speed) < PLAYER_X_MAX)
+    		player->X_pos = (int16_t) (player->X_pos + player->speed);
     }
-
-    // Versstuur een uart_bericht als "update".
-    update_FPGA(player->obj_ID, player->X_pos, player->Y_pos, 0b1);
 }
 
-
-// Deze functie laat de speler, als dat kan, een kogel schieten.
-// Als de speler boven een maximaal aantal kogels zit, kan deze niet schieten. Als dat wel kan, roep schiet functie op.
-// Deze functie is void, aangezien de functie over de bullets updates verstuurd.
-// Gemaakt door Fabian Meijneken - 09/01/2026
+/**
+ * @brief Deze functie laat de speler, als dat kan, een kogel schieten.
+ * 
+ * Als de speler boven een maximaal aantal kogels zit, kan deze niet schieten. Als dat wel kan, roep schiet functie op.
+ * Deze functie is void, aangezien de functie over de bullets updates verstuurd.
+ * @author Fabian meijneken
+ * @date 09/01/2026
+ *
+ * @param player - pointer naar de player struct
+ * @param bullets - pointer naar het eerste item in de bullets array
+ * @param sprite - pointer naar het eerste item in de sprite array
+ *
+ * @return void
+ */
 void player_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite)
 {
-    // Controleer of we naar links of rechts moeten bewegen, en verander player.x hiernaar.
     if (player->active_bullet_count < MAX_PLAYER_BULLET_COUNT)
     {
-    	BulletBeheer(bullets, 1, 1, true, player, sprite);
+    	// Het bulletIndex en sprite_num moeten worden meegestuurd, maar er wordt niets mee gedaan. Vandaar dat deze hier respectievelijk 1 en 0 zijn.
+    	BulletBeheer(bullets, 1, 1, true, player, sprite, 0);
 
         player-> active_bullet_count++;                 // Update de hoeveelheid kogels die de player momenteel heeft.
     }
 }
 
 
-// Deze functie bepaalt een handeling op basis van een frequentie.
-void command_handler(uint8_t command, player_struct* player, bullet_struct* bullets, sprite_struct* sprite)
+/**
+ * @brief Deze functie laat een enemy, als dat kan, een kogel schieten.
+ * 
+ * @author Fabian meijneken
+ * @date 27/01/2026
+ *
+ * @param player - pointer naar de player struct
+ * @param bullets - pointer naar het eerste item in de bullets array
+ * @param sprite - pointer naar het eerste item in de sprite array
+ *
+ * @return void
+ */
+void sprite_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite, int sprite_num)
 {
-	switch (command)
+    // shot by user is hier false. Er zal vanaf sprite x (sprite_num) een bullet worden geschoten.
+
+	if (active_sprite_bullet_count++ <= MAX_SPRITE_BULLET_COUNT)
+		BulletBeheer(bullets, 1, 1, false, player, sprite, sprite_num);
+}
+
+
+/**
+ * @brief Deze functie checkt of er collision is tussen één bullet en de speler / sprites.
+ *
+ * @author Fabian meijneken
+ * @date 27/01/2026
+ *
+ * @param sprites - pointer naar het eerste item in de sprite array
+ * @param player  - pointer naar de player struct
+ * @param bullets - pointer naar het eerste item in de bullets array
+ * @param bulletIndex - Geeft aan over welke bullet het momenteel gaat
+ *
+ * @return int - 0 als er geen collision is, 1 als er collision is.
+ */
+int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_struct* bullets, uint8_t bulletIndex)				//BB 0 voor omhoog, 1 voor omlaag
+{
+
+	// Check of de kogel de speler raakt. de x en y positie van de kogel zijn de x en y positie van de linkerbovenhoek van de kogel sprite .
+	// Belangrijk is dat de kogel zich in een 32x32 sprite bevindt. Als de kogel naar beneden gaat, zit deze tegen de onderkant van zijn sprite aan.
+	// Gaat hij omhoog, zit de kogel tegen de bovenkant van zijn sprite aan.
+	// De kogel zal ALTIJD horizontaal in het midden van zijn sprite zitten.
+
+	// Ook de speler zit gecentreerd in zijn sprite.
+
+	// Belangrijke constanten die deze functie gebruikt:
+	// - BULLET_BREEDTE: De breedte van de kogel sprite in pixels
+	// - BULLET_LENGTE: De lengte van de kogel sprite in pixels
+	// - SPELER_BREEDTE: De breedte van de speler sprite in pixels
+	// - SPELER_LENGTE: De lengte van de speler sprite in pixels
+
+	if ((bullets + bulletIndex)->richting)		// De kogel beweegt omlaag, check of de kogel een speler raakt.
 	{
-		// Pauzeer het spel
-		case 0:
-			if (game_status == GAME_RUNNING)
-				game_status = GAME_PAUSED;
-			if (game_status == GAME_PAUSED)
-				game_status = GAME_RUNNING;
+		if ( ((bullets + bulletIndex)->X_pos + 16 + (BULLET_BREEDTE / 2)) >= (player->X_pos + 16 - (SPELER_BREEDTE / 2))		// Rechterkant van kogel (x locatie) moet groter zijn dan linkerkant van speler (x locatie)
+			&& (bullets + bulletIndex)->X_pos + 16 - (BULLET_BREEDTE / 2) <= player->X_pos + 16 + (SPELER_BREEDTE / 2)			// Linkerkant van de kogel (x locatie) moet kleiner zijn dan rechterkant van speler (x locatie)
+			&& (bullets + bulletIndex)->Y_pos + BULLET_LENGTE >= player->Y_pos
+			&& (bullets + bulletIndex)->Y_pos + BULLET_LENGTE <= player->Y_pos + SPELER_LENGTE		// Check of de kogel y binnen de speler y valt
+		   )
+		{
+			// Verwijder betreffende bullet
+			BulletBeheer(bullets, 2, bulletIndex, true, player, sprites, 0);		// In deze call maken alleen de argumenten "bullets", "actie" (2) en "bulletIndex", uit. player en sprites worden bij actie=2 genegeerd.
+			active_sprite_bullet_count--;
 
-		// Beweeg naar links
-		case 1:
-			player_move(player, 1);
+			if (--(player->lives) == 0)
+				game_status = GAME_OVER;
 
-		// Beweeg naar rechts
-		case 2:
-			player_move(player, 0);
-
-		// Schiet
-		case 3:
-			player_shoot(player, bullets, sprite);
-
+			return 1;
+		}
 	}
+	else		// De kogel beweegt omhoog, check of de kogel een sprite raakt.
+	{
+		for (int i = 0; i < (AANTAL_RIJEN_SPRITES * SPRITES_PER_RIJ); i++)
+		{
+			if ((sprites + i)->alive == 1)		// Alleen checken als de sprite leeft
+			{
+				if ( ((bullets + bulletIndex)->X_pos + 16 + (BULLET_BREEDTE / 2)) >= ((sprites + i)->X_pos + 16 - (SPRITE_BREEDTE / 2))		// Rechterkant van kogel (x locatie) moet groter zijn dan linkerkant van sprite (x locatie)
+					&& (bullets + bulletIndex)->X_pos + 16 - (BULLET_BREEDTE / 2) <= ((sprites + i)->X_pos + 16 + (SPRITE_BREEDTE / 2))		// Linkerkant van de kogel (x locatie) moet kleiner zijn dan rechterkant van sprite (x locatie)
+					&& (bullets + bulletIndex)->Y_pos >= ((sprites + i)->Y_pos)
+					&& (bullets + bulletIndex)->Y_pos <= ((sprites + i)->Y_pos + SPRITE_LENGTE)
+				   )
+				{
+					// Controleer of alle sprites dood zijn
+					if (--aantal_levende_sprites == 0)
+					{
+						game_status = GAME_WON;
+						player->lives++;
+
+						if (player->lives > 3)
+							player->lives = 3;
+
+						return 1;
+					}
+
+
+					// Er is een collision, maak de sprite dood.
+					(sprites + i)->alive = 0;
+
+					// Update score
+					player->score += SCORE_PER_ENEMIE;
+
+					// Versnel het spel
+					SPRITES_MOVE_FREQ -= 1;
+
+					// Verwijder betreffende bullet
+					BulletBeheer(bullets, 2, bulletIndex, true, player, sprites, 0);		// In deze call maken alleen de argumenten "bullets", "actie" (2) en "bulletIndex", uit. player en sprites worden bij actie=2 genegeerd.
+					player->active_bullet_count--;
+
+
+					// Verstuur sprite locaties
+					for (int rij = 1; rij <= AANTAL_RIJEN_SPRITES; rij++)
+					{
+						uint8_t render_bits = 0b0;
+						for (int i = 0; i < SPRITES_PER_RIJ; i++)
+							render_bits |= ((sprites + ((rij-1) * 6) + i) -> alive) << (SPRITES_PER_RIJ - 1 - i);
+
+						update_FPGA(rij, (sprites + ((rij-1) * 6))->X_pos, (sprites + ((rij-1) * 6))->Y_pos, render_bits);
+					}
+
+					// return 1, zodat er niet meerdere items kunnen doodgaan aan 1 bullet.
+					return 1;
+				}
+			}
+		}
+	}
+
+	return 0;
 }
 
 
 //-------------------- Einde Fabian Meijneken --------------------//
 
 
-
-//-------------------- Bram Laurens --------------------//
-
-void run_dft(player_struct* player, bullet_struct* bullets, sprite_struct* sprites)
-{
-	for (uint8_t command = 0; command < (sizeof(command_freqs) - 1) ; command++)
-	{
-		float magnitude = DFT_compute_LUT(command_freqs[command]);
-
-		if (magnitude >= COMMAND_THRESHOLD)
-			command_handler(command, player, bullets, sprites);
-	}
-}
-
-//-------------------- Einde Bram Laurens --------------------//
-
-
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
+	if (hadc->Instance != ADC1)
+		return;
+
 	HAL_GPIO_TogglePin(LED_rood_GPIO_Port, LED_rood_Pin);
-	new_ADC_value_recieved = true;
+
+	// Copy second half of the DMA block into the circular buffer.
+	for (uint32_t i = ADC_DMA_BLOCK_SAMPLES / 2; i < ADC_DMA_BLOCK_SAMPLES; i++)
+	{
+		ADC_buffer[ADC_index] = (int)adc_dma_block[i];
+		ADC_index++;
+		if (ADC_index >= ADC_BUFFER_SIZE)
+		{
+			ADC_index = 0;
+			buffer_full = true;
+		}
+	}
+
+	// Signal main loop that a full 64-sample block has been captured.
+	adc_dma_block_ready = true;
+}
+
+void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
+{
+	if (hadc->Instance != ADC1)
+		return;
+
+	// Copy first half of the DMA block into the circular buffer.
+	for (uint32_t i = 0; i < ADC_DMA_BLOCK_SAMPLES / 2; i++)
+	{
+		ADC_buffer[ADC_index] = (int)adc_dma_block[i];
+		ADC_index++;
+		if (ADC_index >= ADC_BUFFER_SIZE)
+		{
+			ADC_index = 0;
+			buffer_full = true;
+		}
+	}
 }
 
 
