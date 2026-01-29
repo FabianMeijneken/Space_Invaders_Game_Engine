@@ -235,6 +235,8 @@ int main(void)
 				player.Y_pos = 					PLAYER_Y_START;
 				player.speed = 					PLAYER_MOVE_SPEED;
 				player.active_bullet_count = 	0;
+				player.lives = 					3;
+				player.score = 					0;
 
 				//----- Reset Sprites -----//
 				for (uint8_t rij = 0; rij < (AANTAL_RIJEN_SPRITES); rij++)
@@ -1015,7 +1017,7 @@ void move_sprites(sprite_struct* sprites){
 // Deze functie stopt as
 void collision_check_all_bullets(sprite_struct* sprites, player_struct* player, bullet_struct* bullets)
 {
-	for (int i = 0; i < (MAX_BULLET_AMOUNT - 1); i++)
+	for (int i = 0; i < MAX_BULLET_AMOUNT; i++)
 	{
 		if ((bullets + i)->actief == 1)
 			if (collision_per_bullet(sprites, player, bullets, i))
