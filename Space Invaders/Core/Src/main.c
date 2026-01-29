@@ -1105,7 +1105,7 @@ void sprite_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* 
 {
     // shot by user is hier false. Er zal vanaf sprite x (sprite_num) een bullet worden geschoten.
 
-	if (active_sprite_bullet_count <= MAX_SPRITE_BULLET_COUNT)
+	if (active_sprite_bullet_count++ <= MAX_SPRITE_BULLET_COUNT)
 		BulletBeheer(bullets, 1, 1, false, player, sprite, sprite_num);
 }
 
@@ -1149,6 +1149,7 @@ int collision_per_bullet(sprite_struct* sprites, player_struct* player, bullet_s
 		{
 			// Verwijder betreffende bullet
 			BulletBeheer(bullets, 2, bulletIndex, true, player, sprites, 0);		// In deze call maken alleen de argumenten "bullets", "actie" (2) en "bulletIndex", uit. player en sprites worden bij actie=2 genegeerd.
+			active_sprite_bullet_count--;
 
 			if (--(player->lives) == 0)
 				game_status = GAME_OVER;
