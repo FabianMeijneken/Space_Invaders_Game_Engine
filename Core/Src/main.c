@@ -232,8 +232,6 @@ int main(void)
 				player.Y_pos = 					PLAYER_Y_START;
 				player.speed = 					PLAYER_MOVE_SPEED;
 				player.active_bullet_count = 	0;
-				player.lives = 					3;
-				player.score = 					0;
 
 				//----- Reset Sprites -----//
 				for (uint8_t rij = 0; rij < (AANTAL_RIJEN_SPRITES); rij++)
