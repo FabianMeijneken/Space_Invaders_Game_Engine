@@ -17,9 +17,6 @@
   ******************************************************************************
   */
 
-// TODO At collision, send command for only that row. This saves uart size, maby that removes the stutter on colision?
-// TODO low prio, UART can lose position when STM32 resets during UART command.
-
 
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
@@ -77,8 +74,8 @@ volatile bool button_command_override = false;
 // Sprite variables
 uint8_t links_rechts; 													// Deze variable geeft aan of de sprites naar links of rechts bewegen. (0 voor links, 1 voor rechts)
 int SPRITES_MOVE_FREQ = DEF_SPRITES_MOVE_FREQ;								// Deze deelt een 20 Hz klok. met een waar van 10 bewegen de sprites op 2 Hz.
-
 int aantal_levende_sprites = SPRITES_PER_RIJ * AANTAL_RIJEN_SPRITES;		// Deze variable houdt de hoeveelheid levende sprites bij.
+int active_sprite_bullet_count = 0;
 
 // UART variables
 uint32_t tx_buffer[UART2_TX_BUFFER_SIZE];
@@ -1107,8 +1104,9 @@ void player_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* 
 void sprite_shoot(player_struct* player, bullet_struct* bullets, sprite_struct* sprite, int sprite_num)
 {
     // shot by user is hier false. Er zal vanaf sprite x (sprite_num) een bullet worden geschoten.
-	BulletBeheer(bullets, 1, 1, false, player, sprite, sprite_num);
 
+	if (active_sprite_bullet_count <= MAX_SPRITE_BULLET_COUNT)
+		BulletBeheer(bullets, 1, 1, false, player, sprite, sprite_num);
 }
 
 

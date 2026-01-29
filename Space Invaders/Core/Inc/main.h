@@ -151,6 +151,7 @@ enum gamestates {
 // Bullet
 #define BULLET_BREEDTE 			4
 #define BULLET_LENGTE 			9
+#define MAX_SPRITE_BULLET_COUNT 4
 
 // Game end durations
 #define game_over_flicker_duration 	11
