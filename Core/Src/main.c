@@ -171,13 +171,13 @@ int main(void)
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
-	HAL_TIM_Base_Start_IT(&htim3);		// Gebruikt voor DFT.
-	HAL_TIM_Base_Start_IT(&htim4);		// Gebruikt voor game updates.
-	// Capture ADC samples in blocks of 64; HAL will call Conv(Half)Cplt callbacks via DMA.
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_block, ADC_DMA_BLOCK_SAMPLES);
-
-	init_LUTs();						// Initialiseer de LUTs voor de DFT.
-	init_buttons();						// initialize the buttons for command override.
+  HAL_TIM_Base_Start_IT(&htim3);		// Gebruikt voor DFT.
+  HAL_TIM_Base_Start_IT(&htim4);		// Gebruikt voor game updates.
+  // Capture ADC samples in blocks of 64; HAL will call Conv(Half)Cplt callbacks via DMA.
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_block, ADC_DMA_BLOCK_SAMPLES);
+  
+  init_LUTs();						// Initialiseer de LUTs voor de DFT.
+  init_buttons();						// initialize the buttons for command override.
 
   /* USER CODE END 2 */
 
